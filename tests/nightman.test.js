@@ -4,9 +4,22 @@ const NightMan = require("../NightMan.js")
 function iso(value) { return new Date(value).toISOString() }
 
 assert.strictEqual(NightMan.parseGsettingsOutput("'prefer-dark'\n"), "prefer-dark")
-assert.strictEqual(NightMan.parseGsettingsOutput("default"), "")
+assert.strictEqual(NightMan.parseGsettingsOutput("color-scheme: 'prefer-light'\n"), "prefer-light")
+assert.strictEqual(NightMan.parseGsettingsOutput("default"), "default")
+assert.strictEqual(NightMan.parseGsettingsOutput("color-scheme: default"), "default")
+assert.strictEqual(NightMan.parseThemeMode(" Light\n"), "light")
+assert.strictEqual(NightMan.parseThemeMode("unknown"), "")
+assert.strictEqual(NightMan.validAppearanceMode("follow"), true)
+assert.strictEqual(NightMan.validAppearanceMode("manual"), false)
+assert.strictEqual(NightMan.preferenceToMode("prefer-light"), "light")
+assert.strictEqual(NightMan.preferenceToMode("default"), "light")
 assert.strictEqual(NightMan.modeToPreference("light"), "prefer-light")
 assert.strictEqual(NightMan.modeToPreference("dark"), "prefer-dark")
+assert.strictEqual(NightMan.modeToPreference(""), "")
+assert.strictEqual(NightMan.enforcedMode("follow", "light", ""), "")
+assert.strictEqual(NightMan.enforcedMode("auto", "light", "dark"), "dark")
+assert.strictEqual(NightMan.enforcedMode("day", "dark", ""), "light")
+assert.strictEqual(NightMan.enforcedMode("night", "light", ""), "dark")
 
 assert.strictEqual(NightMan.validTime("00:00"), true)
 assert.strictEqual(NightMan.validTime("23:59"), true)
@@ -16,12 +29,14 @@ assert.strictEqual(NightMan.timeToMinutes("19:30"), 1170)
 assert.deepStrictEqual(NightMan.normalizedFixedTimes(" 07:00 ", "19:00 "), { dayStart: "07:00", nightStart: "19:00" })
 assert.strictEqual(NightMan.normalizedFixedTimes(" 07:00 ", "07:00"), null)
 assert.deepStrictEqual(NightMan.parseSettings('{"scheduleMode":"fixed","dayStart":"08:15","nightStart":"20:45"}'), {
-  scheduleMode: "fixed", dayStart: "08:15", nightStart: "20:45", location: null
+  appearanceMode: "auto", scheduleMode: "fixed", dayStart: "08:15", nightStart: "20:45", location: null
 })
 assert.strictEqual(NightMan.parseSettings('{"scheduleMode":"location","location":{"latitude":999,"longitude":0}}').scheduleMode, "automatic")
-assert.deepStrictEqual(NightMan.parseSettings('{"scheduleMode":"fixed","dayStart":"08:00","nightStart":"08:00"}'), {
-  scheduleMode: "fixed", dayStart: "07:00", nightStart: "19:00", location: null
+assert.deepStrictEqual(NightMan.parseSettings('{"appearanceMode":"day","scheduleMode":"fixed","dayStart":"08:00","nightStart":"08:00"}'), {
+  appearanceMode: "day", scheduleMode: "fixed", dayStart: "07:00", nightStart: "19:00", location: null
 })
+assert.strictEqual(NightMan.parseSettings('{"appearanceMode":"bogus"}').appearanceMode, "auto")
+assert.strictEqual(NightMan.parseSettings('{}').appearanceMode, "auto")
 
 assert.deepStrictEqual(NightMan.parseLocationResponse('{"latitude":40.7,"longitude":-74,"city":"New York"}'), {
   latitude: 40.7, longitude: -74, name: "New York"
@@ -92,6 +107,11 @@ assert.strictEqual(NightMan.pendingPreference("prefer-light", "prefer-dark"), "p
 assert.strictEqual(NightMan.pendingPreference("prefer-light", "prefer-light"), "")
 assert.strictEqual(NightMan.retryDelay(0, 3), 30000)
 assert.strictEqual(NightMan.retryDelay(3, 3), -1)
+assert.strictEqual(NightMan.preferenceRetryDelay(0, 4), 250)
+assert.strictEqual(NightMan.preferenceRetryDelay(3, 4), 2000)
+assert.strictEqual(NightMan.preferenceRetryDelay(4, 4), -1)
+assert.strictEqual(NightMan.transitionDelay("2025-01-01T07:00:00.000Z", new Date("2025-01-01T06:59:30.000Z")), 30000)
+assert.strictEqual(NightMan.transitionDelay("", new Date()), -1)
 
 const cached = NightMan.parseCache(JSON.stringify({
   location: { latitude: 1, longitude: 2, name: "Here" },

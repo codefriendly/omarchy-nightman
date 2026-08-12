@@ -20,13 +20,65 @@ Panel {
   property string geocodeActiveQuery: ""
   property string formError: ""
   property string selectedBehavior: "automatic"
-  readonly property bool controlFocused: modeDay.activeFocus || modeNight.activeFocus || modeAuto.activeFocus
-    || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
+  readonly property bool controlFocused: modeFollow.activeFocus || modeAuto.activeFocus || modeDay.activeFocus || modeNight.activeFocus
+    || temporaryOverrideButton.activeFocus || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
     || saveTimesButton.activeFocus
+  readonly property var majorControls: [modeFollow, modeAuto, modeDay, modeNight, temporaryOverrideButton,
+    behaviorAutomatic, behaviorLocation, behaviorFixed, saveTimesButton]
 
   function switchPanel(direction) {
     if (bar && typeof bar.switchPanelFrom === "function") return bar.switchPanelFrom(barIdentity, direction)
     return false
+  }
+
+  function focusControl(control) {
+    if (!control || !control.visible) return
+    control.forceActiveFocus()
+    Qt.callLater(function() { root.keepVisible(control) })
+  }
+
+  function focusedMajorControl() {
+    for (var i = 0; i < majorControls.length; i++) if (majorControls[i].activeFocus) return majorControls[i]
+    return null
+  }
+
+  function activateFocusedControl() {
+    var control = focusedMajorControl()
+    if (control && typeof control.clicked === "function") control.clicked()
+  }
+
+  function keepVisible(control) {
+    if (!control || !panelFlick) return
+    var point = control.mapToItem(content, 0, 0)
+    var top = point.y
+    var bottom = top + control.height
+    if (top < panelFlick.contentY) panelFlick.contentY = Math.max(0, top - Style.space(8))
+    else if (bottom > panelFlick.contentY + panelFlick.height)
+      panelFlick.contentY = Math.min(Math.max(0, panelFlick.contentHeight - panelFlick.height), bottom - panelFlick.height + Style.space(8))
+  }
+
+  function moveMode(value, dx, dy) {
+    var controls = [modeFollow, modeAuto, modeDay, modeNight]
+    var index = value === "follow" ? 0 : (value === "auto" ? 1 : (value === "day" ? 2 : 3))
+    if (dx !== 0) focusControl(controls[Math.max(0, Math.min(controls.length - 1, index + dx))])
+    else if (dy > 0) focusControl(temporaryOverrideButton.visible ? temporaryOverrideButton : selectedBehaviorControl())
+  }
+
+  function selectedBehaviorControl() {
+    if (selectedBehavior === "location") return behaviorLocation
+    if (selectedBehavior === "fixed") return behaviorFixed
+    return behaviorAutomatic
+  }
+
+  function moveBehavior(value, dx, dy) {
+    var controls = [behaviorAutomatic, behaviorLocation, behaviorFixed]
+    var index = value === "automatic" ? 0 : (value === "location" ? 1 : 2)
+    if (dx !== 0) focusControl(controls[Math.max(0, Math.min(controls.length - 1, index + dx))])
+    else if (dy < 0) focusControl(temporaryOverrideButton.visible ? temporaryOverrideButton : modeAuto)
+    else if (dy > 0) {
+      if (selectedBehavior === "location") focusControl(locationField)
+      else if (selectedBehavior === "fixed") focusControl(saveTimesButton)
+    }
   }
 
   function open() {
@@ -43,9 +95,7 @@ Panel {
   }
 
   function chooseMode(value) {
-    if (!nightMan) return
-    if (value === "auto") nightMan.clearOverride(true)
-    else nightMan.setManual(value)
+    if (nightMan) nightMan.setAppearanceMode(value)
   }
 
   function chooseBehavior(value) {
@@ -137,16 +187,35 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: dayField.activeFocus || nightField.activeFocus || locationField.activeFocus || root.controlFocused
-      onMoveRequested: function() { modeDay.forceActiveFocus() }
-      onActivateRequested: modeDay.forceActiveFocus()
+      blocked: dayField.activeFocus || nightField.activeFocus || locationField.activeFocus
+      onMoveRequested: function(dx, dy) {
+        var control = root.focusedMajorControl()
+        if (!control) { root.focusControl(modeFollow); return }
+        if (control === temporaryOverrideButton) {
+          if (dy < 0) root.focusControl(modeAuto)
+          else if (dy > 0) root.focusControl(root.selectedBehaviorControl())
+          return
+        }
+        if (control === saveTimesButton) {
+          if (dy < 0) root.focusControl(dayField.inputControl)
+          return
+        }
+        if (control.value === "follow" || control.value === "auto" || control.value === "day" || control.value === "night")
+          root.moveMode(control.value, dx, dy)
+        else root.moveBehavior(control.value, dx, dy)
+      }
+      onActivateRequested: {
+        if (root.focusedMajorControl()) root.activateFocusedControl()
+        else root.focusControl(modeFollow)
+      }
       onCloseRequested: root.close()
       onTabRequested: function(direction) {
-        if (direction > 0) modeDay.forceActiveFocus()
+        if (direction > 0) modeFollow.forceActiveFocus()
         else root.switchPanel(direction)
       }
 
       Flickable {
+        id: panelFlick
         anchors.fill: parent
         contentWidth: width
         contentHeight: content.implicitHeight
@@ -159,44 +228,19 @@ Panel {
           width: parent.width
           spacing: Style.space(13)
 
-          Item {
+          PanelHero {
             width: parent.width
-            implicitHeight: Math.max(heroGlyph.implicitHeight, heroLabels.implicitHeight)
-
-            Text {
-              id: heroGlyph
-              text: root.nightMan && root.nightMan.mode === "light" ? "☀" : "☾"
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.displayLarge
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Column {
-              id: heroLabels
-              anchors.left: heroGlyph.right
-              anchors.leftMargin: Style.space(14)
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(2)
-
+            title: "NightMan"
+            meta: root.nightMan ? root.nightMan.statusText() : "Starting"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            iconSize: Style.font.displayLarge
+            iconComponent: Component {
               Text {
-                width: parent.width
-                text: root.nightMan ? (root.nightMan.mode === "light" ? "Day mode" : "Night mode") : "NightMan"
+                text: root.nightMan && root.nightMan.mode === "light" ? "☀" : "☾"
                 color: root.bar.foreground
                 font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.title
-                font.bold: true
-              }
-              Text {
-                width: parent.width
-                text: root.nightMan && root.nightMan.overrideActive ? "MANUAL UNTIL NEXT TRANSITION" : "FOLLOWING SCHEDULE"
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1.1
+                font.pixelSize: Style.font.displayLarge
               }
             }
           }
@@ -204,12 +248,39 @@ Panel {
           Row {
             id: modeRow
             width: parent.width
-            spacing: Style.space(6)
-            readonly property real cellWidth: (width - spacing * 2) / 3
+            spacing: Style.space(5)
+            readonly property real cellWidth: (width - spacing * 3) / 4
 
-            ModeButton { id: modeDay; label: "Day"; glyph: "☀"; value: "light"; width: modeRow.cellWidth }
-            ModeButton { id: modeNight; label: "Night"; glyph: "☾"; value: "dark"; width: modeRow.cellWidth }
+            ModeButton { id: modeFollow; label: "Theme"; glyph: ""; value: "follow"; width: modeRow.cellWidth }
             ModeButton { id: modeAuto; label: "Auto"; glyph: "◌"; value: "auto"; width: modeRow.cellWidth }
+            ModeButton { id: modeDay; label: "Day"; glyph: "☀"; value: "day"; width: modeRow.cellWidth }
+            ModeButton { id: modeNight; label: "Night"; glyph: "☾"; value: "night"; width: modeRow.cellWidth }
+          }
+
+          Button {
+            id: temporaryOverrideButton
+            visible: root.nightMan && root.nightMan.appearanceMode === "auto"
+            width: parent.width
+            text: root.nightMan && root.nightMan.overrideActive
+              ? "Return to schedule"
+              : (root.nightMan && root.nightMan.scheduledMode === "light" ? "Use Night until " : "Use Day until ")
+                + (root.nightMan ? root.formatTransition(root.nightMan.nextTransition) : "next schedule change")
+            iconText: root.nightMan && root.nightMan.overrideActive
+              ? (root.nightMan.scheduledMode === "light" ? "☀" : "☾")
+              : (root.nightMan && root.nightMan.scheduledMode === "light" ? "☾" : "☀")
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+            bordered: true
+            focusable: true
+            Keys.onEscapePressed: root.close()
+            Keys.onUpPressed: root.focusControl(modeAuto)
+            Keys.onDownPressed: root.focusControl(root.selectedBehaviorControl())
+            onActiveFocusChanged: if (activeFocus) root.keepVisible(temporaryOverrideButton)
+            onClicked: {
+              if (!root.nightMan) return
+              if (root.nightMan.overrideActive) root.nightMan.clearOverride(true)
+              else root.nightMan.useOppositeUntilTransition()
+            }
           }
 
           Column {
@@ -223,9 +294,19 @@ Panel {
           PanelSeparator { foreground: root.bar.foreground }
 
           PanelSectionHeader {
-            text: "SCHEDULE"
+            text: root.nightMan && root.nightMan.scheduleActive ? "SCHEDULE · ACTIVE" : "SCHEDULE · SAVED, INACTIVE"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
+          }
+
+          Text {
+            visible: root.nightMan && !root.nightMan.scheduleActive
+            width: parent.width
+            text: "These settings are saved and editable. They will apply when you return to Auto."
+            wrapMode: Text.WordWrap
+            color: Qt.darker(root.bar.foreground, 1.4)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
           }
 
           Row {
@@ -328,6 +409,8 @@ Panel {
               bordered: true
               focusable: true
               Keys.onEscapePressed: root.close()
+              Keys.onUpPressed: root.focusControl(dayField.inputControl)
+              onActiveFocusChanged: if (activeFocus) root.keepVisible(saveTimesButton)
               onClicked: root.saveTimes()
             }
           }
@@ -367,7 +450,13 @@ Panel {
     bordered: true
     focusable: true
     Keys.onEscapePressed: root.close()
-    active: root.nightMan && (value === "auto" ? !root.nightMan.overrideActive : root.nightMan.overrideActive && root.nightMan.overrideMode === value)
+    Keys.onLeftPressed: root.moveMode(value, -1, 0)
+    Keys.onRightPressed: root.moveMode(value, 1, 0)
+    Keys.onUpPressed: root.moveMode(value, 0, -1)
+    Keys.onDownPressed: root.moveMode(value, 0, 1)
+    onActiveFocusChanged: if (activeFocus) root.keepVisible(this)
+    fontSize: Style.font.bodySmall
+    active: root.nightMan && root.nightMan.appearanceMode === value
     onClicked: root.chooseMode(value)
   }
 
@@ -381,6 +470,11 @@ Panel {
     bordered: true
     focusable: true
     Keys.onEscapePressed: root.close()
+    Keys.onLeftPressed: root.moveBehavior(value, -1, 0)
+    Keys.onRightPressed: root.moveBehavior(value, 1, 0)
+    Keys.onUpPressed: root.moveBehavior(value, 0, -1)
+    Keys.onDownPressed: root.moveBehavior(value, 0, 1)
+    onActiveFocusChanged: if (activeFocus) root.keepVisible(this)
     active: root.selectedBehavior === value
     onClicked: root.chooseBehavior(value)
   }
@@ -391,18 +485,21 @@ Panel {
     width: parent.width
     spacing: Style.space(8)
     Text {
+      id: infoLabel
       text: label
       color: root.bar.foreground
       opacity: 0.6
       font.family: root.bar.fontFamily
       font.pixelSize: Style.font.bodySmall
     }
-    Item { width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2); height: 1 }
+    Item { width: Style.space(4); height: 1 }
     Text {
+      width: Math.max(0, parent.width - infoLabel.implicitWidth - parent.spacing * 2 - Style.space(4))
       text: value
       color: root.bar.foreground
       font.family: root.bar.fontFamily
       font.pixelSize: Style.font.bodySmall
+      horizontalAlignment: Text.AlignRight
       elide: Text.ElideLeft
     }
   }
@@ -410,6 +507,7 @@ Panel {
   component TimeField: Column {
     required property string label
     property alias text: input.text
+    property alias inputControl: input
     spacing: Style.spacing.labelGap
     Text {
       text: label.toUpperCase()

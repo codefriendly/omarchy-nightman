@@ -49,7 +49,7 @@ BarWidget {
     bar: root.bar
     text: root.glyph
     active: root.overridden
-    tooltipText: ""
+    tooltipText: root.nightMan ? root.nightMan.statusText() : "NightMan"
 
     onPressed: function(mouseButton) {
       if (mouseButton === Qt.LeftButton) root.togglePanel()

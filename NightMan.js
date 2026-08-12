@@ -1,6 +1,7 @@
 var FALLBACK_SUNRISE_MINUTES = 7 * 60
 var FALLBACK_SUNSET_MINUTES = 19 * 60
 var DEFAULT_SETTINGS = {
+  appearanceMode: "auto",
   scheduleMode: "automatic",
   dayStart: "07:00",
   nightStart: "19:00",
@@ -12,8 +13,25 @@ function trim(value) {
 }
 
 function parseGsettingsOutput(output) {
-  var value = trim(output).replace(/^['"]|['"]$/g, "")
-  return value === "prefer-light" || value === "prefer-dark" ? value : ""
+  var value = trim(output)
+  var match = value.match(/(?:^|:\s*)['"]?(prefer-light|prefer-dark|default)['"]?$/)
+  return match ? match[1] : ""
+}
+
+function parseThemeMode(output) {
+  var value = trim(output).toLowerCase()
+  return value === "light" || value === "dark" ? value : ""
+}
+
+function validAppearanceMode(value) {
+  return value === "follow" || value === "auto" || value === "day" || value === "night"
+}
+
+function preferenceToMode(preference) {
+  if (preference === "prefer-dark") return "dark"
+  // GNOME's "default" color-scheme has no dark preference, so display it as light.
+  if (preference === "prefer-light" || preference === "default") return "light"
+  return ""
 }
 
 function parseDate(value) {
@@ -64,6 +82,7 @@ function normalizedFixedTimes(dayStart, nightStart) {
 
 function normalizeSettings(value) {
   var data = value && typeof value === "object" ? value : {}
+  var appearanceMode = validAppearanceMode(data.appearanceMode) ? data.appearanceMode : DEFAULT_SETTINGS.appearanceMode
   var mode = data.scheduleMode
   if (mode !== "automatic" && mode !== "location" && mode !== "fixed") mode = DEFAULT_SETTINGS.scheduleMode
   var dayStart = validTime(data.dayStart) ? trim(data.dayStart) : DEFAULT_SETTINGS.dayStart
@@ -75,6 +94,7 @@ function normalizeSettings(value) {
   var location = normalizedLocation(data.location)
   if (mode === "location" && !location) mode = "automatic"
   return {
+    appearanceMode: appearanceMode,
     scheduleMode: mode,
     dayStart: dayStart,
     nightStart: nightStart,
@@ -298,6 +318,19 @@ function retryDelay(retriesScheduled, maximumRetries) {
   return attempt >= maximum ? -1 : 30 * 1000 * Math.pow(2, attempt)
 }
 
+function preferenceRetryDelay(retriesScheduled, maximumRetries) {
+  var attempt = Math.max(0, Math.floor(Number(retriesScheduled) || 0))
+  var maximum = Math.max(0, Math.floor(Number(maximumRetries) || 0))
+  return attempt >= maximum ? -1 : 250 * Math.pow(2, attempt)
+}
+
+function transitionDelay(nextTransition, now) {
+  var transition = parseDate(nextTransition)
+  var date = now instanceof Date ? now : new Date(now)
+  if (!transition || isNaN(date.getTime())) return -1
+  return Math.max(1, Math.min(2147483647, transition.getTime() - date.getTime()))
+}
+
 function stateAt(schedule, now, dayStart, nightStart, forceFixed) {
   return settingsState(schedule, {
     scheduleMode: forceFixed ? "fixed" : "automatic",
@@ -307,7 +340,16 @@ function stateAt(schedule, now, dayStart, nightStart, forceFixed) {
 }
 
 function modeToPreference(mode) {
-  return mode === "light" ? "prefer-light" : "prefer-dark"
+  if (mode === "light") return "prefer-light"
+  if (mode === "dark") return "prefer-dark"
+  return ""
+}
+
+function enforcedMode(appearanceMode, scheduledMode, overrideMode) {
+  if (appearanceMode === "day") return "light"
+  if (appearanceMode === "night") return "dark"
+  if (appearanceMode === "auto") return overrideMode === "light" || overrideMode === "dark" ? overrideMode : scheduledMode
+  return ""
 }
 
 if (typeof module !== "undefined") {
@@ -316,6 +358,9 @@ if (typeof module !== "undefined") {
     FALLBACK_SUNSET_MINUTES: FALLBACK_SUNSET_MINUTES,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     parseGsettingsOutput: parseGsettingsOutput,
+    parseThemeMode: parseThemeMode,
+    validAppearanceMode: validAppearanceMode,
+    preferenceToMode: preferenceToMode,
     validCoordinates: validCoordinates,
     normalizedLocation: normalizedLocation,
     validTime: validTime,
@@ -338,7 +383,10 @@ if (typeof module !== "undefined") {
     shouldExpireOverride: shouldExpireOverride,
     pendingPreference: pendingPreference,
     retryDelay: retryDelay,
+    preferenceRetryDelay: preferenceRetryDelay,
+    transitionDelay: transitionDelay,
     stateAt: stateAt,
-    modeToPreference: modeToPreference
+    modeToPreference: modeToPreference,
+    enforcedMode: enforcedMode
   }
 }

@@ -351,7 +351,7 @@ Panel {
           PanelSeparator { foreground: root.bar.foreground }
 
           PanelSectionHeader {
-            text: root.nightMan && root.nightMan.scheduleActive ? "SCHEDULE · ACTIVE" : "SCHEDULE · SAVED, INACTIVE"
+            text: "SCHEDULE"
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
           }
@@ -359,7 +359,7 @@ Panel {
           Text {
             visible: root.nightMan && !root.nightMan.scheduleActive
             width: parent.width
-            text: "These settings are saved and editable. They will apply when you return to Auto."
+            text: "Used when Appearance is set to Auto."
             wrapMode: Text.WordWrap
             color: Qt.darker(root.bar.foreground, 1.4)
             font.family: root.bar.fontFamily

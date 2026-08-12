@@ -111,7 +111,10 @@ Panel {
     selectedBehavior = value
     formError = ""
     if (value === "automatic") nightMan.setScheduleBehavior("automatic")
-    else if (value === "location" && nightMan.config.location) nightMan.setScheduleBehavior("location")
+    else if (value === "location") {
+      if (locationDraft) nightMan.setExplicitLocation(locationDraft)
+      else formError = "Search for and select a location first"
+    }
     else if (value === "fixed") {
       if (!nightMan.setFixedTimes(dayField.text, nightField.text)) formError = "Enter two different valid 24-hour times"
     }

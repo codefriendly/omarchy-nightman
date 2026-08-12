@@ -30,8 +30,8 @@ The widget has no click shortcuts that alter mode. Its sun/moon shows the applie
 
 Settings are saved atomically to `~/.local/state/nightman/settings.json` and watched for external edits. Three practical behaviors are available:
 
-1. **Automatic solar** — prefers valid coordinates saved by Omarchy Weather in `~/.local/state/omarchy/settings/weather.json`, then uses approximate IP geolocation from ipapi.co. If solar data is unavailable it falls back to the configured fixed times.
-2. **Location solar** — search Open-Meteo geocoding in the panel and select a result. **Use auto** clears the explicit location and returns to automatic location selection.
+1. **Automatic solar** — immediately uses valid coordinates saved by Omarchy Weather in `~/.local/state/omarchy/settings/weather.json`, then approximate IP geolocation from ipapi.co. No location search is shown in this tab. If solar data is unavailable it falls back to the configured fixed times.
+2. **Location solar** — opens a city search without changing the active schedule until a result is selected. Selecting a result switches to that explicit location. Choose **Automatic** to clear it and return to automatic location selection.
 3. **Fixed custom times** — enter distinct 24-hour `HH:MM` day and night start values. Overnight day ranges are supported.
 
 The time fields and all loaded settings are validated. Coordinates must be finite and within latitude `-90..90` and longitude `-180..180`. Search and forecast values are passed to `curl` as argument arrays rather than shell-interpolated commands.

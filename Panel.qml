@@ -19,9 +19,10 @@ Panel {
   property string geocodePendingQuery: ""
   property string geocodeActiveQuery: ""
   property string formError: ""
+  property string selectedBehavior: "automatic"
   readonly property bool controlFocused: modeDay.activeFocus || modeNight.activeFocus || modeAuto.activeFocus
     || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
-    || saveTimesButton.activeFocus || autoButton.activeFocus
+    || saveTimesButton.activeFocus
 
   function switchPanel(direction) {
     if (bar && typeof bar.switchPanelFrom === "function") return bar.switchPanelFrom(barIdentity, direction)
@@ -37,6 +38,7 @@ Panel {
     if (!nightMan) return
     dayField.text = nightMan.config.dayStart
     nightField.text = nightMan.config.nightStart
+    selectedBehavior = nightMan.config.scheduleMode
     formError = ""
   }
 
@@ -48,11 +50,12 @@ Panel {
 
   function chooseBehavior(value) {
     if (!nightMan) return
+    selectedBehavior = value
+    formError = ""
     if (value === "automatic") nightMan.clearExplicitLocation()
-    else if (value === "location") nightMan.setScheduleBehavior("location")
+    else if (value === "location" && nightMan.config.location) nightMan.setScheduleBehavior("location")
     else if (value === "fixed") {
       if (!nightMan.setFixedTimes(dayField.text, nightField.text)) formError = "Enter two different valid 24-hour times"
-      else formError = ""
     }
   }
 
@@ -236,81 +239,47 @@ Panel {
             BehaviorButton { id: behaviorFixed; label: "Fixed times"; value: "fixed"; width: behaviorRow.cellWidth }
           }
 
-          Column {
-            visible: root.nightMan && root.nightMan.config.scheduleMode === "fixed"
+          Text {
+            visible: root.selectedBehavior === "automatic"
             width: parent.width
-            spacing: Style.space(8)
-
-            Row {
-              width: parent.width
-              spacing: Style.space(8)
-
-              TimeField { id: dayField; label: "Day start"; width: (parent.width - parent.spacing) / 2 }
-              TimeField { id: nightField; label: "Night start"; width: (parent.width - parent.spacing) / 2 }
-            }
-
-            Button {
-              id: saveTimesButton
-              width: parent.width
-              text: "Save fixed times"
-              iconText: "✓"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              bordered: true
-              focusable: true
-              Keys.onEscapePressed: root.close()
-              onClicked: root.saveTimes()
-            }
+            text: "Uses your Omarchy Weather location when set; otherwise uses approximate IP location."
+            wrapMode: Text.WordWrap
+            color: Qt.darker(root.bar.foreground, 1.4)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
           }
 
           Column {
-            visible: root.nightMan && root.nightMan.config.scheduleMode !== "fixed"
+            visible: root.selectedBehavior === "location"
             width: parent.width
             spacing: Style.space(8)
 
             Text {
               width: parent.width
-              text: root.nightMan && root.nightMan.config.scheduleMode === "automatic"
-                ? "Automatic prefers coordinates saved by Omarchy Weather, then IP location."
-                : "Search to replace the chosen solar location."
+              text: root.nightMan && root.nightMan.config.location
+                ? "Chosen location: " + root.nightMan.config.location.name + ". Search below to replace it."
+                : "Search for a city, then select a result to use its sunrise and sunset."
               wrapMode: Text.WordWrap
               color: Qt.darker(root.bar.foreground, 1.4)
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.bodySmall
             }
 
-            Row {
+            TextField {
+              id: locationField
               width: parent.width
-              spacing: Style.space(8)
-
-              TextField {
-                id: locationField
-                width: parent.width - autoButton.width - parent.spacing
-                placeholderText: "Search city"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onTextChanged: {
-                  root.geocodePendingQuery = text.trim()
-                  if (root.geocodePendingQuery.length < 2) root.suggestions = []
-                  geocodeDebounce.restart()
-                }
-                Keys.onDownPressed: root.suggestionIndex = Math.min(root.suggestions.length - 1, root.suggestionIndex + 1)
-                Keys.onUpPressed: root.suggestionIndex = Math.max(0, root.suggestionIndex - 1)
-                Keys.onReturnPressed: if (root.suggestions.length > 0) root.selectLocation(root.suggestions[root.suggestionIndex])
-                Keys.onEscapePressed: { text = ""; root.suggestions = []; keyCatcher.forceActiveFocus() }
+              placeholderText: "Search city"
+              foreground: root.bar.foreground
+              font.family: root.bar.fontFamily
+              onTextChanged: {
+                root.geocodePendingQuery = text.trim()
+                if (root.geocodePendingQuery.length < 2) root.suggestions = []
+                geocodeDebounce.restart()
               }
-
-              Button {
-                id: autoButton
-                text: "Use auto"
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                bordered: true
-                active: root.nightMan && root.nightMan.config.scheduleMode === "automatic"
-                focusable: true
-                Keys.onEscapePressed: root.close()
-                onClicked: root.chooseBehavior("automatic")
-              }
+              Keys.onDownPressed: root.suggestionIndex = Math.min(root.suggestions.length - 1, root.suggestionIndex + 1)
+              Keys.onUpPressed: root.suggestionIndex = Math.max(0, root.suggestionIndex - 1)
+              Keys.onReturnPressed: if (root.suggestions.length > 0) root.selectLocation(root.suggestions[root.suggestionIndex])
+              Keys.onEscapePressed: { text = ""; root.suggestions = []; keyCatcher.forceActiveFocus() }
             }
 
             Column {
@@ -333,6 +302,33 @@ Panel {
                   onClicked: root.selectLocation(modelData)
                 }
               }
+            }
+          }
+
+          Column {
+            visible: root.selectedBehavior === "fixed"
+            width: parent.width
+            spacing: Style.space(8)
+
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
+
+              TimeField { id: dayField; label: "Day start"; width: (parent.width - parent.spacing) / 2 }
+              TimeField { id: nightField; label: "Night start"; width: (parent.width - parent.spacing) / 2 }
+            }
+
+            Button {
+              id: saveTimesButton
+              width: parent.width
+              text: "Save fixed times"
+              iconText: "✓"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              bordered: true
+              focusable: true
+              Keys.onEscapePressed: root.close()
+              onClicked: root.saveTimes()
             }
           }
 
@@ -385,9 +381,7 @@ Panel {
     bordered: true
     focusable: true
     Keys.onEscapePressed: root.close()
-    active: root.nightMan && root.nightMan.config.scheduleMode === value
-    enabled: value !== "location" || (root.nightMan && root.nightMan.config.location)
-    tooltipText: enabled ? "" : "Search for a location below"
+    active: root.selectedBehavior === value
     onClicked: root.chooseBehavior(value)
   }
 

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "codefriendly.nightman",
+  "name": "NightMan",
+  "version": "1.0.0",
+  "author": "codefriendly",
+  "description": "Switch the standard desktop color preference at local sunrise and sunset",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "NightMan",
+    "description": "Sun/moon indicator with a temporary manual override",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

@@ -13,6 +13,7 @@ Panel {
   property var anchorItem: null
   property var hostWidget: null
   property var nightMan: null
+  property string clockFormat: "HH:mm"
   readonly property var barIdentity: hostWidget || root
   property var suggestions: []
   property int suggestionIndex: 0
@@ -165,7 +166,16 @@ Panel {
     if (!value) return "Pending schedule"
     var date = new Date(value)
     if (isNaN(date.getTime())) return "Pending schedule"
-    return Qt.formatDateTime(date, "ddd h:mm AP")
+    var timeFormat = /(?:AP|ap)/.test(clockFormat) ? "h:mm AP" : "HH:mm"
+    return Qt.formatDateTime(date, "ddd " + timeFormat)
+  }
+
+  function nextTransitionLabel() {
+    if (!nightMan || !nightMan.nextTransition) return "Pending schedule"
+    var event = nightMan.scheduleSource === "sun"
+      ? (nightMan.scheduledMode === "light" ? "Sunset" : "Sunrise")
+      : (nightMan.scheduledMode === "light" ? "Night starts" : "Day starts")
+    return event + " · " + formatTransition(nightMan.nextTransition)
   }
 
   function sourceLabel() {
@@ -174,7 +184,7 @@ Panel {
     if (nightMan.scheduleSource !== "sun") return "Solar unavailable · fixed-time fallback"
     if (nightMan.locationSource === "explicit") return "Solar · chosen location"
     if (nightMan.locationSource === "weather") return "Solar · Weather location"
-    if (nightMan.locationSource === "cache") return "Solar · cached automatic location"
+    if (nightMan.locationSource === "cache") return "Automatic Location"
     if (nightMan.locationSource === "saved") return "Solar · saved location fallback"
     return "Solar · automatic IP location"
   }
@@ -345,7 +355,7 @@ Panel {
             spacing: Style.spacing.labelGap
             InfoRow { label: "Schedule"; value: root.sourceLabel() }
             InfoRow { label: "Location"; value: root.nightMan ? root.nightMan.activeLocationName : "—" }
-            InfoRow { label: "Next"; value: root.nightMan ? root.formatTransition(root.nightMan.nextTransition) : "—" }
+            InfoRow { label: "Next"; value: root.nextTransitionLabel() }
           }
 
           PanelSeparator { foreground: root.bar.foreground }

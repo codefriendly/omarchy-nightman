@@ -12,6 +12,9 @@ BarWidget {
   readonly property string glyph: mode === "light" ? "☀" : (mode === "dark" ? "☾" : "◌")
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
+  readonly property var clockWidgets: bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets("omarchy.clock") : []
+  readonly property string clockFormat: clockWidgets.length > 0 && clockWidgets[0].configuredFormat !== undefined
+    ? String(clockWidgets[0].configuredFormat) : "HH:mm"
 
   function injectPanel() {
     var target = panelLoader.item
@@ -20,6 +23,7 @@ BarWidget {
     if ("anchorItem" in target) target.anchorItem = button
     if ("hostWidget" in target) target.hostWidget = root
     if ("nightMan" in target) target.nightMan = root.nightMan
+    if ("clockFormat" in target) target.clockFormat = root.clockFormat
   }
 
   function open() { if (panelLoader.item) panelLoader.item.open() }

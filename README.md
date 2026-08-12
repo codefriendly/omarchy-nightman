@@ -1,12 +1,14 @@
 # NightMan
 
-NightMan is a pure [Omarchy Quattro](https://omarchy.org/) plugin that schedules the standard GNOME desktop color-scheme preference. It sets only:
+NightMan helps manage light and dark mode on Omarchy. It can follow sunrise and sunset, use a location you choose, or switch at fixed times. Apps set to follow the system appearance will update automatically.
+
+It only changes this GNOME preference:
 
 ```text
 org.gnome.desktop.interface color-scheme
 ```
 
-It does **not** switch the Omarchy theme, wallpaper, `gtk-theme`, or Night Light, and it installs no systemd unit.
+Your Omarchy theme, wallpaper, GTK theme, and Night Light stay untouched. NightMan runs as an Omarchy Quattro plugin—there are no systemd services to install.
 
 ## Install
 
@@ -14,33 +16,53 @@ It does **not** switch the Omarchy theme, wallpaper, `gtk-theme`, or Night Light
 omarchy plugin add https://github.com/codefriendly/omarchy-nightman.git --enable
 ```
 
-The plugin contains a Quattro service and a panel-capable bar widget. Under Quattro's current enablement contract, removing the third-party widget from the bar also disables its service.
+NightMan adds a sun/moon icon to the bar. Click it to open the panel.
 
-## Panel and modes
+## Using NightMan
 
-Click the sun/moon bar widget to open or close its popup. The popup provides:
+The controls at the top temporarily override the schedule:
 
-- **Day** — apply light mode as a manual override until the next scheduled transition.
-- **Night** — apply dark mode as a manual override until the next scheduled transition.
-- **Auto** — clear the manual override and immediately apply the schedule.
+- **Day** switches to light mode until the next scheduled change.
+- **Night** switches to dark mode until the next scheduled change.
+- **Auto** returns control to the schedule.
 
-The widget has no click shortcuts that alter mode. Its sun/moon shows the applied state and its small accent dot shows an active manual override. The panel also shows the schedule source, active location, and next transition.
+A small dot on the bar icon means a manual override is active. The panel also shows the location and time of the next scheduled change.
 
-## Schedule and location settings
+## Choosing a schedule
 
-Settings are saved atomically to `~/.local/state/nightman/settings.json` and watched for external edits. Three practical behaviors are available:
+NightMan offers three schedule options:
 
-1. **Automatic solar** — immediately uses valid coordinates saved by Omarchy Weather in `~/.local/state/omarchy/settings/weather.json`, then approximate IP geolocation from ipapi.co. No location search is shown in this tab. If solar data is unavailable it falls back to the configured fixed times.
-2. **Location solar** — opens a city search without changing the active schedule until a result is selected. Selecting a result switches to that explicit location. Choose **Automatic** to clear it and return to automatic location selection.
-3. **Fixed custom times** — enter distinct 24-hour `HH:MM` day and night start values. Overnight day ranges are supported.
+### Automatic
 
-The time fields and all loaded settings are validated. Coordinates must be finite and within latitude `-90..90` and longitude `-180..180`. Search and forecast values are passed to `curl` as argument arrays rather than shell-interpolated commands.
+Uses sunrise and sunset for your current location. NightMan first checks for a location you selected in Omarchy Weather. If there isn't one, it estimates your location from your IP address.
 
-Open-Meteo supplies seven days of sunrise/sunset data. Solar schedules and locations are cached in `~/.local/state/nightman/schedule.json`; manual override state is stored in `override.json`. Requests time out, use bounded retries, and the service refreshes every six hours. Automatic location can disclose your IP to ipapi.co and sends coordinates to Open-Meteo. Typing two or more characters in the location search sends the search text to Open-Meteo after a short debounce.
+IP-based location may be inaccurate when you use a VPN. Selecting a city in Omarchy Weather or NightMan avoids that problem.
 
-## IPC
+### Location
 
-Compatibility commands remain available on target `codefriendly.nightman`:
+Search for a city and select it from the results. NightMan will use that city's sunrise and sunset times until you switch back to **Automatic** or choose another schedule.
+
+### Fixed times
+
+Choose exactly when day mode and night mode begin. Times use the 24-hour `HH:MM` format.
+
+If NightMan cannot retrieve solar times, it temporarily falls back to the configured fixed times. The defaults are 07:00 and 19:00.
+
+## Privacy and stored data
+
+Automatic IP location contacts [ipapi.co](https://ipapi.co/). Solar times and city search are provided by [Open-Meteo](https://open-meteo.com/).
+
+Typing at least two characters in the city search sends that text to Open-Meteo. When IP location is used, your approximate coordinates are also sent to Open-Meteo to retrieve sunrise and sunset times.
+
+NightMan stores its settings and cached schedule under:
+
+```text
+~/.local/state/nightman/
+```
+
+## Command-line controls
+
+The panel should cover normal use, but the same controls are available over Quattro IPC:
 
 ```bash
 omarchy-shell codefriendly.nightman status
@@ -50,11 +72,9 @@ omarchy-shell codefriendly.nightman dark
 omarchy-shell codefriendly.nightman auto
 ```
 
-`light`, `dark`, and `toggle` create manual overrides; `auto` clears one. `status` returns JSON including applied and scheduled mode, override state, schedule behavior/source, active location/source, next transition, validated settings, and the last error.
+`status` returns the current mode, schedule, location source, next transition, and any recent error as JSON.
 
-## Requirements and development
-
-NightMan depends only on standard Omarchy components: Quattro/Quickshell, `curl`, `gsettings`, and core utilities. It uses schema version 1 and the installed `service` plus `bar-widget` entry-point contract. The popup is loaded by the bar widget using the same nested `Panel`/`KeyboardPanel` contract as Omarchy Weather.
+## Development
 
 ```bash
 omarchy plugin validate .

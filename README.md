@@ -1,12 +1,12 @@
 # NightMan
 
-NightMan is a pure [Omarchy Quattro](https://omarchy.org/) plugin that switches the standard GNOME desktop color-scheme preference at local sunrise and sunset. It sets only:
+NightMan is a pure [Omarchy Quattro](https://omarchy.org/) plugin that schedules the standard GNOME desktop color-scheme preference. It sets only:
 
 ```text
 org.gnome.desktop.interface color-scheme
 ```
 
-It does **not** switch the Omarchy theme, wallpaper, `gtk-theme`, or Night Light. Applications that honor the standard preference—including many browsers and other desktop apps—can follow it independently.
+It does **not** switch the Omarchy theme, wallpaper, `gtk-theme`, or Night Light, and it installs no systemd unit.
 
 ## Install
 
@@ -14,15 +14,33 @@ It does **not** switch the Omarchy theme, wallpaper, `gtk-theme`, or Night Light
 omarchy plugin add https://github.com/codefriendly/omarchy-nightman.git --enable
 ```
 
-The plugin contains a background Quattro service and an optional bar widget. Enabling it places the widget in the bar; removing the widget from the bar also disables the third-party service under Quattro's current plugin enablement contract. No systemd unit is installed or used.
+The plugin contains a Quattro service and a panel-capable bar widget. Under Quattro's current enablement contract, removing the third-party widget from the bar also disables its service.
 
-## Controls
+## Panel and modes
 
-- **Left click the widget:** toggle light/dark and keep that manual override until the next scheduled sunrise or sunset.
-- **Right click the widget:** return to automatic mode immediately.
-- Sun/moon shows the current state. A small accent dot indicates a manual override.
+Click the sun/moon bar widget to open or close its popup. The popup provides:
 
-IPC uses the target `codefriendly.nightman`:
+- **Day** — apply light mode as a manual override until the next scheduled transition.
+- **Night** — apply dark mode as a manual override until the next scheduled transition.
+- **Auto** — clear the manual override and immediately apply the schedule.
+
+The widget has no click shortcuts that alter mode. Its sun/moon shows the applied state and its small accent dot shows an active manual override. The panel also shows the schedule source, active location, and next transition.
+
+## Schedule and location settings
+
+Settings are saved atomically to `~/.local/state/nightman/settings.json` and watched for external edits. Three practical behaviors are available:
+
+1. **Automatic solar** — prefers valid coordinates saved by Omarchy Weather in `~/.local/state/omarchy/settings/weather.json`, then uses approximate IP geolocation from ipapi.co. If solar data is unavailable it falls back to the configured fixed times.
+2. **Location solar** — search Open-Meteo geocoding in the panel and select a result. **Use auto** clears the explicit location and returns to automatic location selection.
+3. **Fixed custom times** — enter distinct 24-hour `HH:MM` day and night start values. Overnight day ranges are supported.
+
+The time fields and all loaded settings are validated. Coordinates must be finite and within latitude `-90..90` and longitude `-180..180`. Search and forecast values are passed to `curl` as argument arrays rather than shell-interpolated commands.
+
+Open-Meteo supplies seven days of sunrise/sunset data. Solar schedules and locations are cached in `~/.local/state/nightman/schedule.json`; manual override state is stored in `override.json`. Requests time out, use bounded retries, and the service refreshes every six hours. Automatic location can disclose your IP to ipapi.co and sends coordinates to Open-Meteo. Typing two or more characters in the location search sends the search text to Open-Meteo after a short debounce.
+
+## IPC
+
+Compatibility commands remain available on target `codefriendly.nightman`:
 
 ```bash
 omarchy-shell codefriendly.nightman status
@@ -32,27 +50,14 @@ omarchy-shell codefriendly.nightman dark
 omarchy-shell codefriendly.nightman auto
 ```
 
-`status` returns JSON with the applied mode, scheduled mode, override state, schedule source, next transition, coarse location label, and last error. `light` and `dark`, like `toggle`, are manual overrides. `auto` clears the override and immediately applies the scheduled state.
+`light`, `dark`, and `toggle` create manual overrides; `auto` clears one. `status` returns JSON including applied and scheduled mode, override state, schedule behavior/source, active location/source, next transition, validated settings, and the last error.
 
-## Scheduling, privacy, and offline behavior
+## Requirements and development
 
-On startup NightMan obtains approximate coordinates from `https://ipapi.co/json/` without an API key, then requests seven days of sunrise/sunset data from Open-Meteo's forecast API. It refreshes that coarse location every six hours so travel and timezone changes recover without excessive location requests. Failed startup or refresh requests receive three bounded short retries before normal periodic refresh resumes. Requests use `curl` argument arrays, time out, and never interpolate data into a shell command. Approximate coordinates, a location label, and the sunrise/sunset schedule are cached in:
-
-```text
-~/.local/state/nightman/schedule.json
-```
-
-The cache lets NightMan schedule normally through short outages. If there is no usable cache or it has aged beyond its forecast window, NightMan falls back to local **07:00 light / 19:00 dark** times. It refreshes the schedule every six hours and evaluates the desired state every minute, including at startup and resume-like clock jumps.
-
-Using automatic location discloses your IP address to ipapi.co and sends the resulting approximate coordinates to Open-Meteo. No API key or precise device location service is used. Manual override state is stored in `~/.local/state/nightman/override.json` so it survives a shell restart but still expires at the next transition.
-
-## Requirements and assumptions
-
-NightMan depends only on tools present in standard Omarchy: Quattro/Quickshell, `curl`, `gsettings`, and core utilities. It follows the installed Quattro plugin contracts: schema version 1, `service` plus `bar-widget` entry points, service lookup through `bar.shell.serviceFor(id)`, and IPC through `IpcHandler`.
-
-## Development
+NightMan depends only on standard Omarchy components: Quattro/Quickshell, `curl`, `gsettings`, and core utilities. It uses schema version 1 and the installed `service` plus `bar-widget` entry-point contract. The popup is loaded by the bar widget using the same nested `Panel`/`KeyboardPanel` contract as Omarchy Weather.
 
 ```bash
 omarchy plugin validate .
 node tests/nightman.test.js
+qmllint BarWidget.qml Panel.qml Service.qml
 ```

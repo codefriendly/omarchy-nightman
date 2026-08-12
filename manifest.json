@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "codefriendly.nightman",
   "name": "NightMan",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "codefriendly",
-  "description": "Switch the standard desktop color preference at local sunrise and sunset",
+  "description": "Schedule the standard desktop color preference with a compact bar panel",
   "kinds": [
     "service",
     "bar-widget"
@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "NightMan",
-    "description": "Sun/moon indicator with a temporary manual override",
+    "description": "Sun/moon indicator with mode and schedule controls",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"

@@ -10,15 +10,38 @@ BarWidget {
   readonly property string mode: nightMan ? nightMan.mode : ""
   readonly property bool overridden: nightMan ? nightMan.overrideActive : false
   readonly property string glyph: mode === "light" ? "☀" : (mode === "dark" ? "☾" : "◌")
-  readonly property string tooltip: {
-    if (!nightMan) return "NightMan is starting"
-    var label = mode === "light" ? "Light" : "Dark"
-    var detail = overridden ? "manual override until the next transition" : "automatic " + nightMan.scheduleSource + " schedule"
-    return "NightMan: " + label + " (" + detail + ")"
+  readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+  readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
+
+  function injectPanel() {
+    var target = panelLoader.item
+    if (!target) return
+    if ("bar" in target) target.bar = root.bar
+    if ("anchorItem" in target) target.anchorItem = button
+    if ("hostWidget" in target) target.hostWidget = root
+    if ("nightMan" in target) target.nightMan = root.nightMan
   }
+
+  function open() { if (panelLoader.item) panelLoader.item.open() }
+  function close() { if (panelLoader.item) panelLoader.item.close() }
+  function togglePanel() { if (panelLoader.item) panelLoader.item.toggle() }
+  function closeForPopoutSwitch() { if (panelLoader.item) panelLoader.item.closeForPopoutSwitch() }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
+  onBarChanged: injectPanel()
+  onNightManChanged: injectPanel()
+
+  Loader {
+    id: panelLoader
+    active: true
+    source: Qt.resolvedUrl("Panel.qml")
+    visible: false
+    onLoaded: {
+      root.injectPanel()
+      Qt.callLater(root.injectPanel)
+    }
+  }
 
   BarIconButton {
     id: button
@@ -26,12 +49,10 @@ BarWidget {
     bar: root.bar
     text: root.glyph
     active: root.overridden
-    tooltipText: root.tooltip
+    tooltipText: ""
 
     onPressed: function(mouseButton) {
-      if (!root.nightMan) return
-      if (mouseButton === Qt.RightButton) root.nightMan.clearOverride(true)
-      else root.nightMan.toggleManual()
+      if (mouseButton === Qt.LeftButton) root.togglePanel()
     }
   }
 

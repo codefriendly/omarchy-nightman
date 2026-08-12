@@ -1,5 +1,11 @@
 var FALLBACK_SUNRISE_MINUTES = 7 * 60
 var FALLBACK_SUNSET_MINUTES = 19 * 60
+var DEFAULT_SETTINGS = {
+  scheduleMode: "automatic",
+  dayStart: "07:00",
+  nightStart: "19:00",
+  location: null
+}
 
 function trim(value) {
   return String(value === undefined || value === null ? "" : value).replace(/^\s+|\s+$/g, "")
@@ -17,25 +23,111 @@ function parseDate(value) {
   return isNaN(date.getTime()) ? null : date
 }
 
+function validCoordinateValue(value) {
+  if (value === null || value === undefined || typeof value === "boolean") return false
+  if (typeof value === "string" && trim(value) === "") return false
+  return isFinite(Number(value))
+}
+
 function validCoordinates(latitude, longitude) {
+  if (!validCoordinateValue(latitude) || !validCoordinateValue(longitude)) return false
   var lat = Number(latitude)
   var lon = Number(longitude)
-  return isFinite(lat) && isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180
+  return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180
+}
+
+function normalizedLocation(value) {
+  if (!value || !validCoordinates(value.latitude, value.longitude)) return null
+  return {
+    latitude: Number(value.latitude),
+    longitude: Number(value.longitude),
+    name: trim(value.name)
+  }
+}
+
+function validTime(value) {
+  return /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(trim(value))
+}
+
+function timeToMinutes(value) {
+  if (!validTime(value)) return null
+  var parts = trim(value).split(":")
+  return Number(parts[0]) * 60 + Number(parts[1])
+}
+
+function normalizedFixedTimes(dayStart, nightStart) {
+  var day = trim(dayStart)
+  var night = trim(nightStart)
+  if (!validTime(day) || !validTime(night) || day === night) return null
+  return { dayStart: day, nightStart: night }
+}
+
+function normalizeSettings(value) {
+  var data = value && typeof value === "object" ? value : {}
+  var mode = data.scheduleMode
+  if (mode !== "automatic" && mode !== "location" && mode !== "fixed") mode = DEFAULT_SETTINGS.scheduleMode
+  var dayStart = validTime(data.dayStart) ? trim(data.dayStart) : DEFAULT_SETTINGS.dayStart
+  var nightStart = validTime(data.nightStart) ? trim(data.nightStart) : DEFAULT_SETTINGS.nightStart
+  if (dayStart === nightStart) {
+    dayStart = DEFAULT_SETTINGS.dayStart
+    nightStart = DEFAULT_SETTINGS.nightStart
+  }
+  var location = normalizedLocation(data.location)
+  if (mode === "location" && !location) mode = "automatic"
+  return {
+    scheduleMode: mode,
+    dayStart: dayStart,
+    nightStart: nightStart,
+    location: location
+  }
+}
+
+function parseSettings(raw) {
+  try {
+    return normalizeSettings(JSON.parse(String(raw || "{}")))
+  } catch (e) {
+    return normalizeSettings(null)
+  }
 }
 
 function parseLocationResponse(raw) {
   try {
     var data = JSON.parse(String(raw || "{}"))
-    var latitude = Number(data.latitude)
-    var longitude = Number(data.longitude)
-    if (!validCoordinates(latitude, longitude)) return null
-    return {
-      latitude: latitude,
-      longitude: longitude,
-      name: trim(data.city || data.region || data.country_name || data.country || "")
-    }
+    return normalizedLocation({
+      latitude: data.latitude,
+      longitude: data.longitude,
+      name: data.city || data.region || data.country_name || data.country || ""
+    })
   } catch (e) {
     return null
+  }
+}
+
+function parseWeatherLocation(raw) {
+  try {
+    var data = JSON.parse(String(raw || "{}"))
+    return normalizedLocation(data)
+  } catch (e) {
+    return null
+  }
+}
+
+function parseGeocodingResults(raw) {
+  try {
+    var data = JSON.parse(String(raw || "{}"))
+    var results = data.results || []
+    var output = []
+    for (var i = 0; i < results.length; i++) {
+      var item = results[i]
+      var location = normalizedLocation(item)
+      if (!location || !item.name) continue
+      var detail = [item.admin1, item.country].filter(function(part) { return !!part }).join(", ")
+      location.name = trim(item.name) + (detail ? ", " + detail : "")
+      output.push(location)
+    }
+    return output
+  } catch (e) {
+    return []
   }
 }
 
@@ -65,10 +157,9 @@ function parseCache(raw) {
   try {
     var data = JSON.parse(String(raw || "{}"))
     if (!data || typeof data !== "object") return null
-    var location = data.location
+    var location = normalizedLocation(data.location)
     var schedule = data.schedule
-    if (!location || !validCoordinates(location.latitude, location.longitude)) return null
-    if (!schedule || !Array.isArray(schedule.days)) return null
+    if (!location || !schedule || !Array.isArray(schedule.days)) return null
     var parsedSchedule = parseForecastResponse(JSON.stringify({
       daily: {
         time: schedule.days.map(function(day) { return day.date }),
@@ -79,12 +170,30 @@ function parseCache(raw) {
     }))
     if (!parsedSchedule) return null
     return {
-      location: { latitude: Number(location.latitude), longitude: Number(location.longitude), name: trim(location.name) },
+      location: location,
+      locationSource: trim(data.locationSource),
       schedule: parsedSchedule
     }
   } catch (e) {
     return null
   }
+}
+
+function sameLocation(first, second) {
+  var a = normalizedLocation(first)
+  var b = normalizedLocation(second)
+  return !!a && !!b && Math.abs(a.latitude - b.latitude) < 0.000001 && Math.abs(a.longitude - b.longitude) < 0.000001
+}
+
+function scheduleSettingsChanged(first, second) {
+  var a = normalizeSettings(first)
+  var b = normalizeSettings(second)
+  var locationsMatch = (!a.location && !b.location)
+    || (!!a.location && !!b.location && sameLocation(a.location, b.location) && a.location.name === b.location.name)
+  return a.scheduleMode !== b.scheduleMode
+    || a.dayStart !== b.dayStart
+    || a.nightStart !== b.nightStart
+    || !locationsMatch
 }
 
 function localDayKey(date) {
@@ -96,7 +205,6 @@ function scheduleState(schedule, now) {
   var date = now instanceof Date ? now : new Date(now)
   if (isNaN(date.getTime())) date = new Date()
   var nowMs = date.getTime()
-  var previousSunset = null
   var nextTransition = null
   var activeDay = null
   var firstSunrise = null
@@ -110,7 +218,6 @@ function scheduleState(schedule, now) {
     if (!firstSunrise || sunrise.getTime() < firstSunrise.getTime()) firstSunrise = sunrise
     if (!lastSunset || sunset.getTime() > lastSunset.getTime()) lastSunset = sunset
     if (sunrise.getTime() <= nowMs && sunset.getTime() > nowMs) activeDay = { sunrise: sunrise, sunset: sunset }
-    if (sunset.getTime() <= nowMs && (!previousSunset || sunset.getTime() > previousSunset.getTime())) previousSunset = sunset
     if (sunrise.getTime() > nowMs && (!nextTransition || sunrise.getTime() < nextTransition.getTime())) nextTransition = sunrise
     if (sunset.getTime() > nowMs && (!nextTransition || sunset.getTime() < nextTransition.getTime())) nextTransition = sunset
   }
@@ -128,25 +235,35 @@ function scheduleState(schedule, now) {
 function fallbackState(now, sunriseMinutes, sunsetMinutes) {
   var date = now instanceof Date ? now : new Date(now)
   if (isNaN(date.getTime())) date = new Date()
-  var sunrise = isFinite(Number(sunriseMinutes)) ? Number(sunriseMinutes) : FALLBACK_SUNRISE_MINUTES
-  var sunset = isFinite(Number(sunsetMinutes)) ? Number(sunsetMinutes) : FALLBACK_SUNSET_MINUTES
+  var sunrise = isFinite(Number(sunriseMinutes)) ? Math.max(0, Math.min(1439, Number(sunriseMinutes))) : FALLBACK_SUNRISE_MINUTES
+  var sunset = isFinite(Number(sunsetMinutes)) ? Math.max(0, Math.min(1439, Number(sunsetMinutes))) : FALLBACK_SUNSET_MINUTES
+  if (sunrise === sunset) {
+    sunrise = FALLBACK_SUNRISE_MINUTES
+    sunset = FALLBACK_SUNSET_MINUTES
+  }
   var minute = date.getHours() * 60 + date.getMinutes()
-  var light = minute >= sunrise && minute < sunset
+  var light = sunrise < sunset ? minute >= sunrise && minute < sunset : minute >= sunrise || minute < sunset
+  var nextMinutes = light ? sunset : sunrise
   var next = new Date(date.getTime())
   next.setSeconds(0, 0)
-  if (light) {
-    next.setHours(Math.floor(sunset / 60), sunset % 60, 0, 0)
-  } else if (minute < sunrise) {
-    next.setHours(Math.floor(sunrise / 60), sunrise % 60, 0, 0)
-  } else {
-    next.setDate(next.getDate() + 1)
-    next.setHours(Math.floor(sunrise / 60), sunrise % 60, 0, 0)
-  }
+  next.setHours(Math.floor(nextMinutes / 60), nextMinutes % 60, 0, 0)
+  if (next.getTime() <= date.getTime()) next.setDate(next.getDate() + 1)
   return {
     mode: light ? "light" : "dark",
     source: "fixed-time",
     nextTransition: next.toISOString()
   }
+}
+
+function settingsState(schedule, settings, now) {
+  var normalized = normalizeSettings(settings)
+  var dayMinutes = timeToMinutes(normalized.dayStart)
+  var nightMinutes = timeToMinutes(normalized.nightStart)
+  if (normalized.scheduleMode !== "fixed") {
+    var calculated = scheduleState(schedule, now)
+    if (calculated.source === "sun") return calculated
+  }
+  return fallbackState(now, dayMinutes, nightMinutes)
 }
 
 function parseOverride(raw) {
@@ -181,9 +298,12 @@ function retryDelay(retriesScheduled, maximumRetries) {
   return attempt >= maximum ? -1 : 30 * 1000 * Math.pow(2, attempt)
 }
 
-function stateAt(schedule, now) {
-  var calculated = scheduleState(schedule, now)
-  return calculated.source === "sun" ? calculated : fallbackState(now)
+function stateAt(schedule, now, dayStart, nightStart, forceFixed) {
+  return settingsState(schedule, {
+    scheduleMode: forceFixed ? "fixed" : "automatic",
+    dayStart: validTime(dayStart) ? dayStart : DEFAULT_SETTINGS.dayStart,
+    nightStart: validTime(nightStart) ? nightStart : DEFAULT_SETTINGS.nightStart
+  }, now)
 }
 
 function modeToPreference(mode) {
@@ -194,13 +314,25 @@ if (typeof module !== "undefined") {
   module.exports = {
     FALLBACK_SUNRISE_MINUTES: FALLBACK_SUNRISE_MINUTES,
     FALLBACK_SUNSET_MINUTES: FALLBACK_SUNSET_MINUTES,
+    DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     parseGsettingsOutput: parseGsettingsOutput,
     validCoordinates: validCoordinates,
+    normalizedLocation: normalizedLocation,
+    validTime: validTime,
+    timeToMinutes: timeToMinutes,
+    normalizedFixedTimes: normalizedFixedTimes,
+    normalizeSettings: normalizeSettings,
+    parseSettings: parseSettings,
     parseLocationResponse: parseLocationResponse,
+    parseWeatherLocation: parseWeatherLocation,
+    parseGeocodingResults: parseGeocodingResults,
     parseForecastResponse: parseForecastResponse,
     parseCache: parseCache,
+    sameLocation: sameLocation,
+    scheduleSettingsChanged: scheduleSettingsChanged,
     scheduleState: scheduleState,
     fallbackState: fallbackState,
+    settingsState: settingsState,
     parseOverride: parseOverride,
     overrideExpired: overrideExpired,
     shouldExpireOverride: shouldExpireOverride,

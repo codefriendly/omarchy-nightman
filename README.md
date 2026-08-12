@@ -45,7 +45,7 @@ IP location can be inaccurate with a VPN. Selecting a city in Omarchy Weather or
 
 ### Location
 
-Search for a city and select a result. NightMan uses that city's sunrise and sunset until you choose another schedule.
+Search for a city, select a result, and save it. NightMan keeps the saved location when you choose another schedule, so returning to Location restores it.
 
 ### Fixed times
 

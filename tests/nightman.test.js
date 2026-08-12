@@ -32,6 +32,9 @@ assert.deepStrictEqual(NightMan.parseSettings('{"scheduleMode":"fixed","dayStart
   appearanceMode: "auto", scheduleMode: "fixed", dayStart: "08:15", nightStart: "20:45", location: null
 })
 assert.strictEqual(NightMan.parseSettings('{"scheduleMode":"location","location":{"latitude":999,"longitude":0}}').scheduleMode, "automatic")
+assert.deepStrictEqual(NightMan.parseSettings('{"scheduleMode":"automatic","location":{"latitude":59.9,"longitude":10.7,"name":"Oslo"}}').location, {
+  latitude: 59.9, longitude: 10.7, name: "Oslo"
+})
 assert.deepStrictEqual(NightMan.parseSettings('{"appearanceMode":"day","scheduleMode":"fixed","dayStart":"08:00","nightStart":"08:00"}'), {
   appearanceMode: "day", scheduleMode: "fixed", dayStart: "07:00", nightStart: "19:00", location: null
 })

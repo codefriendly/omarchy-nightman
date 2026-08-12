@@ -20,11 +20,12 @@ Panel {
   property string geocodeActiveQuery: ""
   property string formError: ""
   property string selectedBehavior: "automatic"
+  property var locationDraft: null
   readonly property bool controlFocused: modeFollow.activeFocus || modeAuto.activeFocus || modeDay.activeFocus || modeNight.activeFocus
     || durationPermanent.activeFocus || durationUntil.activeFocus || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
-    || saveTimesButton.activeFocus
+    || saveLocationButton.activeFocus || saveTimesButton.activeFocus
   readonly property var majorControls: [modeFollow, modeAuto, modeDay, modeNight, durationPermanent, durationUntil,
-    behaviorAutomatic, behaviorLocation, behaviorFixed, saveTimesButton]
+    behaviorAutomatic, behaviorLocation, behaviorFixed, saveLocationButton, saveTimesButton]
   readonly property string selectedDayNight: {
     if (!nightMan) return ""
     if (nightMan.appearanceMode === "day") return "light"
@@ -96,6 +97,7 @@ Panel {
     if (!nightMan) return
     dayField.text = nightMan.config.dayStart
     nightField.text = nightMan.config.nightStart
+    locationDraft = nightMan.config.location
     selectedBehavior = nightMan.config.scheduleMode
     formError = ""
   }
@@ -108,7 +110,7 @@ Panel {
     if (!nightMan) return
     selectedBehavior = value
     formError = ""
-    if (value === "automatic") nightMan.clearExplicitLocation()
+    if (value === "automatic") nightMan.setScheduleBehavior("automatic")
     else if (value === "location" && nightMan.config.location) nightMan.setScheduleBehavior("location")
     else if (value === "fixed") {
       if (!nightMan.setFixedTimes(dayField.text, nightField.text)) formError = "Enter two different valid 24-hour times"
@@ -138,11 +140,21 @@ Panel {
   }
 
   function selectLocation(location) {
-    if (!nightMan || !nightMan.setExplicitLocation(location)) return
+    var normalized = NightMan.normalizedLocation(location)
+    if (!normalized) return
+    locationDraft = normalized
     suggestions = []
     locationField.text = ""
     geocodePendingQuery = ""
     geocodeActiveQuery = ""
+    formError = ""
+  }
+
+  function saveLocation() {
+    if (!nightMan || !locationDraft || !nightMan.setExplicitLocation(locationDraft)) {
+      formError = "Search for and select a location first"
+      return
+    }
     formError = ""
   }
 
@@ -204,8 +216,8 @@ Panel {
           else if (dy > 0) root.focusControl(root.selectedBehaviorControl())
           return
         }
-        if (control === saveTimesButton) {
-          if (dy < 0) root.focusControl(dayField.inputControl)
+        if (control === saveLocationButton || control === saveTimesButton) {
+          if (dy < 0) root.focusControl(control === saveLocationButton ? locationField : dayField.inputControl)
           return
         }
         if (control.value === "follow" || control.value === "auto" || control.value === "day" || control.value === "night")
@@ -377,8 +389,8 @@ Panel {
 
             Text {
               width: parent.width
-              text: root.nightMan && root.nightMan.config.location
-                ? "Chosen location: " + root.nightMan.config.location.name + ". Search below to replace it."
+              text: root.locationDraft
+                ? "Chosen location: " + root.locationDraft.name + ". Search below to replace it."
                 : "Search for a city, then select a result to use its sunrise and sunset."
               wrapMode: Text.WordWrap
               color: Qt.darker(root.bar.foreground, 1.4)
@@ -423,6 +435,21 @@ Panel {
                   onClicked: root.selectLocation(modelData)
                 }
               }
+            }
+
+            Button {
+              id: saveLocationButton
+              width: parent.width
+              text: "Save location"
+              iconText: "✓"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              bordered: true
+              focusable: true
+              Keys.onEscapePressed: root.close()
+              Keys.onUpPressed: root.focusControl(locationField)
+              onActiveFocusChanged: if (activeFocus) root.keepVisible(saveLocationButton)
+              onClicked: root.saveLocation()
             }
           }
 

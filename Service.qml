@@ -287,6 +287,7 @@ Item {
     }
     if (value === root.appearanceMode) {
       if (value === "follow") { root.followThemeApplied = false; applyCurrentThemePreference() }
+      else if (value === "auto" && root.overrideActive) root.clearOverride(true)
       return true
     }
     if (value !== "auto") clearOverride(false)
@@ -304,10 +305,11 @@ Item {
     return updated
   }
 
-  function useOppositeUntilTransition() {
+  function useUntilTransition(value) {
     if (!root.stateReady) return "not ready"
-    if (root.appearanceMode !== "auto") return "unavailable outside Auto"
-    return setManual(root.scheduledMode === "light" ? "dark" : "light")
+    if (value !== "light" && value !== "dark") return "invalid"
+    if (root.appearanceMode !== "auto" && !root.setAppearanceMode("auto")) return "unable to select Auto"
+    return root.setManual(value)
   }
 
   function clearOverride(applyImmediately) {

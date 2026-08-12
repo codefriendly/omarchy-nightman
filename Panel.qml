@@ -21,10 +21,16 @@ Panel {
   property string formError: ""
   property string selectedBehavior: "automatic"
   readonly property bool controlFocused: modeFollow.activeFocus || modeAuto.activeFocus || modeDay.activeFocus || modeNight.activeFocus
-    || temporaryOverrideButton.activeFocus || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
+    || durationPermanent.activeFocus || durationUntil.activeFocus || behaviorAutomatic.activeFocus || behaviorLocation.activeFocus || behaviorFixed.activeFocus
     || saveTimesButton.activeFocus
-  readonly property var majorControls: [modeFollow, modeAuto, modeDay, modeNight, temporaryOverrideButton,
+  readonly property var majorControls: [modeFollow, modeAuto, modeDay, modeNight, durationPermanent, durationUntil,
     behaviorAutomatic, behaviorLocation, behaviorFixed, saveTimesButton]
+  readonly property string selectedDayNight: {
+    if (!nightMan) return ""
+    if (nightMan.appearanceMode === "day") return "light"
+    if (nightMan.appearanceMode === "night") return "dark"
+    return nightMan.overrideActive ? nightMan.overrideMode : ""
+  }
 
   function switchPanel(direction) {
     if (bar && typeof bar.switchPanelFrom === "function") return bar.switchPanelFrom(barIdentity, direction)
@@ -61,7 +67,7 @@ Panel {
     var controls = [modeFollow, modeAuto, modeDay, modeNight]
     var index = value === "follow" ? 0 : (value === "auto" ? 1 : (value === "day" ? 2 : 3))
     if (dx !== 0) focusControl(controls[Math.max(0, Math.min(controls.length - 1, index + dx))])
-    else if (dy > 0) focusControl(temporaryOverrideButton.visible ? temporaryOverrideButton : selectedBehaviorControl())
+    else if (dy > 0) focusControl(durationSection.visible ? durationPermanent : selectedBehaviorControl())
   }
 
   function selectedBehaviorControl() {
@@ -74,7 +80,7 @@ Panel {
     var controls = [behaviorAutomatic, behaviorLocation, behaviorFixed]
     var index = value === "automatic" ? 0 : (value === "location" ? 1 : 2)
     if (dx !== 0) focusControl(controls[Math.max(0, Math.min(controls.length - 1, index + dx))])
-    else if (dy < 0) focusControl(temporaryOverrideButton.visible ? temporaryOverrideButton : modeAuto)
+    else if (dy < 0) focusControl(durationSection.visible ? durationPermanent : modeAuto)
     else if (dy > 0) {
       if (selectedBehavior === "location") focusControl(locationField)
       else if (selectedBehavior === "fixed") focusControl(saveTimesButton)
@@ -191,8 +197,10 @@ Panel {
       onMoveRequested: function(dx, dy) {
         var control = root.focusedMajorControl()
         if (!control) { root.focusControl(modeFollow); return }
-        if (control === temporaryOverrideButton) {
-          if (dy < 0) root.focusControl(modeAuto)
+        if (control === durationPermanent || control === durationUntil) {
+          if (dx < 0) root.focusControl(durationPermanent)
+          else if (dx > 0) root.focusControl(durationUntil)
+          else if (dy < 0) root.focusControl(root.selectedDayNight === "light" ? modeDay : modeNight)
           else if (dy > 0) root.focusControl(root.selectedBehaviorControl())
           return
         }
@@ -257,29 +265,61 @@ Panel {
             ModeButton { id: modeNight; label: "Night"; glyph: "☾"; value: "night"; width: modeRow.cellWidth }
           }
 
-          Button {
-            id: temporaryOverrideButton
-            visible: root.nightMan && root.nightMan.appearanceMode === "auto"
+          Column {
+            id: durationSection
+            visible: root.selectedDayNight !== ""
             width: parent.width
-            text: root.nightMan && root.nightMan.overrideActive
-              ? "Return to schedule"
-              : (root.nightMan && root.nightMan.scheduledMode === "light" ? "Use Night until " : "Use Day until ")
-                + (root.nightMan ? root.formatTransition(root.nightMan.nextTransition) : "next schedule change")
-            iconText: root.nightMan && root.nightMan.overrideActive
-              ? (root.nightMan.scheduledMode === "light" ? "☀" : "☾")
-              : (root.nightMan && root.nightMan.scheduledMode === "light" ? "☾" : "☀")
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            bordered: true
-            focusable: true
-            Keys.onEscapePressed: root.close()
-            Keys.onUpPressed: root.focusControl(modeAuto)
-            Keys.onDownPressed: root.focusControl(root.selectedBehaviorControl())
-            onActiveFocusChanged: if (activeFocus) root.keepVisible(temporaryOverrideButton)
-            onClicked: {
-              if (!root.nightMan) return
-              if (root.nightMan.overrideActive) root.nightMan.clearOverride(true)
-              else root.nightMan.useOppositeUntilTransition()
+            spacing: Style.spacing.labelGap
+
+            Text {
+              text: root.selectedDayNight === "light" ? "DAY MODE" : "NIGHT MODE"
+              color: Qt.darker(root.bar.foreground, 1.4)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.letterSpacing: 1
+            }
+
+            Row {
+              id: durationRow
+              width: parent.width
+              spacing: Style.space(6)
+              readonly property real cellWidth: (width - spacing) / 2
+
+              Button {
+                id: durationPermanent
+                width: durationRow.cellWidth
+                text: "Permanent"
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                bordered: true
+                focusable: true
+                active: root.nightMan && (root.selectedDayNight === "light"
+                  ? root.nightMan.appearanceMode === "day" : root.nightMan.appearanceMode === "night")
+                Keys.onEscapePressed: root.close()
+                Keys.onLeftPressed: root.focusControl(durationPermanent)
+                Keys.onRightPressed: root.focusControl(durationUntil)
+                Keys.onUpPressed: root.focusControl(root.selectedDayNight === "light" ? modeDay : modeNight)
+                Keys.onDownPressed: root.focusControl(root.selectedBehaviorControl())
+                onClicked: if (root.nightMan) root.nightMan.setAppearanceMode(root.selectedDayNight === "light" ? "day" : "night")
+              }
+
+              Button {
+                id: durationUntil
+                width: durationRow.cellWidth
+                text: "Until " + (root.nightMan ? root.formatTransition(root.nightMan.nextTransition) : "next change")
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                fontSize: Style.font.bodySmall
+                bordered: true
+                focusable: true
+                active: root.nightMan && root.nightMan.appearanceMode === "auto" && root.nightMan.overrideActive
+                Keys.onEscapePressed: root.close()
+                Keys.onLeftPressed: root.focusControl(durationPermanent)
+                Keys.onRightPressed: root.focusControl(durationUntil)
+                Keys.onUpPressed: root.focusControl(root.selectedDayNight === "light" ? modeDay : modeNight)
+                Keys.onDownPressed: root.focusControl(root.selectedBehaviorControl())
+                onClicked: if (root.nightMan) root.nightMan.useUntilTransition(root.selectedDayNight)
+              }
             }
           }
 
@@ -456,7 +496,9 @@ Panel {
     Keys.onDownPressed: root.moveMode(value, 0, 1)
     onActiveFocusChanged: if (activeFocus) root.keepVisible(this)
     fontSize: Style.font.bodySmall
-    active: root.nightMan && root.nightMan.appearanceMode === value
+    active: root.nightMan && (value === "day" ? root.selectedDayNight === "light"
+      : (value === "night" ? root.selectedDayNight === "dark"
+      : root.nightMan.appearanceMode === value && !root.nightMan.overrideActive))
     onClicked: root.chooseMode(value)
   }
 

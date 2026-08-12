@@ -23,19 +23,15 @@ Click the sun/moon bar icon to open the panel. The header always shows NightMan'
 The selected mode is saved across shell restarts and Omarchy theme changes:
 
 - **Theme** (Follow theme) lets Omarchy control the appearance. When selected, NightMan reads the active Omarchy theme's light/dark mode, applies its matching color-scheme preference, and confirms the result. Later external changes are observed but not corrected. GNOME's `default` observation is displayed as Light because it expresses no dark preference.
-- **Auto** enforces the saved schedule.
-- **Day** pins `prefer-light` until another mode is selected.
-- **Night** pins `prefer-dark` until another mode is selected.
+- **Auto** follows the saved schedule without any extra override controls.
+- **Day** selects light mode. It is permanent by default, but can instead last until the next scheduled change.
+- **Night** selects dark mode. It is permanent by default, but can instead last until the next scheduled change.
 
-NightMan continuously watches `color-scheme`. In Auto, Day, Night, and an active temporary override, changes made by a theme switch or another program are corrected immediately. Follow theme never corrects them. NightMan never writes `gtk-theme`.
+After selecting Day or Night, choose **Permanent** or **Until _next schedule time_**. A temporary choice survives a shell restart and expires at the displayed solar or fixed-time transition. Selecting Day or Night itself always defaults to Permanent.
 
-Existing installations migrate to **Auto** and keep their schedule and location settings.
+NightMan continuously watches `color-scheme`. In Auto, pinned Day or Night, and a temporary Day or Night, changes made by a theme switch or another program are corrected immediately. Follow theme never corrects them. NightMan never writes `gtk-theme`.
 
-## Temporary Auto override
-
-Auto shows one contextual action: **Use Night until _next schedule time_** or **Use Day until _next schedule time_**. The shown time is the actual next solar or fixed-time transition. The header clearly identifies the override and its expiry. It survives a shell restart, then expires at the next scheduled transition.
-
-Choosing Follow theme, Day, or Night clears a temporary override. The schedule stays editable in those modes, but is labelled saved and inactive until Auto is selected again.
+Existing installations migrate to **Auto** and keep their schedule and location settings. The schedule stays editable in Theme, Day, and Night, but is labelled saved and inactive until Auto—or a temporary Day/Night choice—uses it again.
 
 ## Choosing a schedule
 
@@ -86,7 +82,7 @@ omarchy-shell codefriendly.nightman dark
 omarchy-shell codefriendly.nightman auto
 ```
 
-They are available only while the persistent mode is Auto. `light`, `dark`, and `toggle` create a temporary override until the next scheduled transition. `auto` clears that override and returns to the schedule; it does not select persistent Auto from another mode. Mutating commands return `not ready` until saved state has loaded.
+They are available only while Auto is active. `light`, `dark`, and `toggle` create the same temporary Day or Night choice shown in the panel. `auto` clears that temporary choice and returns to the schedule; it does not select Auto from another persistent mode. Mutating commands return `not ready` until saved state has loaded.
 
 Removing or disabling the NightMan widget stops its plugin service, so it no longer monitors or changes the preference.
 

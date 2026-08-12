@@ -41,10 +41,10 @@ assert.deepStrictEqual(NightMan.parseSettings('{"appearanceMode":"day","schedule
 assert.strictEqual(NightMan.parseSettings('{"appearanceMode":"bogus"}').appearanceMode, "auto")
 assert.strictEqual(NightMan.parseSettings('{}').appearanceMode, "auto")
 
-assert.deepStrictEqual(NightMan.parseLocationResponse('{"latitude":40.7,"longitude":-74,"city":"New York"}'), {
-  latitude: 40.7, longitude: -74, name: "New York"
+assert.deepStrictEqual(NightMan.parseIpWhoResponse('{"success":true,"latitude":30.4,"longitude":-97.6,"city":"Pflugerville","region":"Texas","country":"United States"}'), {
+  latitude: 30.4, longitude: -97.6, name: "Pflugerville, Texas, United States"
 })
-assert.strictEqual(NightMan.parseLocationResponse('{"latitude":999,"longitude":0}'), null)
+assert.strictEqual(NightMan.parseIpWhoResponse('{"success":false,"message":"Rate limit exceeded"}'), null)
 assert.strictEqual(NightMan.validCoordinates(null, 0), false)
 assert.strictEqual(NightMan.validCoordinates("", 0), false)
 assert.strictEqual(NightMan.validCoordinates(false, 0), false)
@@ -52,6 +52,24 @@ assert.deepStrictEqual(NightMan.parseWeatherLocation('{"name":"Oslo","latitude":
   latitude: 59.9, longitude: 10.7, name: "Oslo"
 })
 assert.strictEqual(NightMan.parseWeatherLocation('{"latitude":"nan","longitude":10}'), null)
+const weatherLocation = { latitude: 1, longitude: 2, name: "Weather" }
+const cachedLocation = { latitude: 3, longitude: 4, name: "Cached" }
+const savedLocation = { latitude: 5, longitude: 6, name: "Saved" }
+assert.deepStrictEqual(NightMan.automaticLocationCandidate(weatherLocation, cachedLocation, savedLocation), {
+  location: weatherLocation, source: "weather", shouldCache: true
+})
+assert.deepStrictEqual(NightMan.automaticLocationCandidate(null, cachedLocation, savedLocation), {
+  location: cachedLocation, source: "cache", shouldCache: false
+})
+assert.deepStrictEqual(NightMan.automaticLocationCandidate(null, null, savedLocation), {
+  location: savedLocation, source: "saved", shouldCache: true
+})
+assert.strictEqual(NightMan.automaticLocationCandidate(null, null, null), null)
+assert.deepStrictEqual(NightMan.normalizeSettings({
+  scheduleMode: "fixed", dayStart: "08:00", nightStart: "20:00", location: savedLocation
+}), {
+  appearanceMode: "auto", scheduleMode: "fixed", dayStart: "08:00", nightStart: "20:00", location: savedLocation
+})
 assert.deepStrictEqual(NightMan.parseGeocodingResults('{"results":[{"name":"Oslo","admin1":"Oslo","country":"Norway","latitude":59.9,"longitude":10.7},{"name":"Bad","latitude":200,"longitude":0}]}'), [
   { latitude: 59.9, longitude: 10.7, name: "Oslo, Oslo, Norway" }
 ])

@@ -174,6 +174,8 @@ Panel {
     if (nightMan.scheduleSource !== "sun") return "Solar unavailable · fixed-time fallback"
     if (nightMan.locationSource === "explicit") return "Solar · chosen location"
     if (nightMan.locationSource === "weather") return "Solar · Weather location"
+    if (nightMan.locationSource === "cache") return "Solar · cached automatic location"
+    if (nightMan.locationSource === "saved") return "Solar · saved location fallback"
     return "Solar · automatic IP location"
   }
 

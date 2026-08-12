@@ -26,6 +26,7 @@ Item {
   property bool cacheLoaded: false
   property bool overrideLoaded: false
   property bool settingsLoaded: false
+  property bool automaticLocationLoaded: false
   property bool stateLoadStarted: false
   property string pendingPreference: ""
   property string activePreference: ""
@@ -40,16 +41,18 @@ Item {
   property bool preferenceRetryExhausted: false
   property int preferenceRetryCount: 0
   property bool themeApplyPending: false
+  property var automaticLocation: null
 
   readonly property int maximumNetworkRetries: 3
   readonly property int maximumPreferenceRetries: 4
-  readonly property bool stateReady: root.initialized && root.cacheLoaded && root.overrideLoaded && root.settingsLoaded
+  readonly property bool stateReady: root.initialized && root.cacheLoaded && root.overrideLoaded && root.settingsLoaded && root.automaticLocationLoaded
   readonly property string appearanceMode: root.config.appearanceMode
   readonly property bool scheduleActive: root.appearanceMode === "auto"
   readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/nightman"
   readonly property string cachePath: stateDir + "/schedule.json"
   readonly property string overridePath: stateDir + "/override.json"
   readonly property string settingsPath: stateDir + "/settings.json"
+  readonly property string automaticLocationPath: stateDir + "/automatic-location.json"
   readonly property string weatherLocationPath: Quickshell.env("HOME") + "/.local/state/omarchy/settings/weather.json"
   readonly property string activeLocationName: root.location ? (root.location.name || root.location.latitude + ", " + root.location.longitude) : "Fallback"
 
@@ -70,6 +73,7 @@ Item {
       nextTransition: root.nextTransition,
       location: root.activeLocationName,
       locationSource: root.locationSource,
+      automaticLocation: root.automaticLocation,
       settings: root.config,
       ready: root.stateReady,
       lastError: root.lastError
@@ -446,6 +450,7 @@ Item {
       }
     }
     root.cacheLoaded = true
+    root.seedAutomaticLocation()
     evaluate()
     maybeStartNetwork()
   }
@@ -455,8 +460,29 @@ Item {
     cacheFile.setText(JSON.stringify({ location: root.location, locationSource: root.locationSource, schedule: root.schedule }, null, 2) + "\n")
   }
 
+  function loadAutomaticLocation(raw) {
+    if (!root.stateLoadStarted) return
+    root.automaticLocation = NightMan.parseWeatherLocation(raw)
+    root.automaticLocationLoaded = true
+    root.seedAutomaticLocation()
+    root.evaluate()
+    root.maybeStartNetwork()
+  }
+
+  function saveAutomaticLocation(value) {
+    var normalized = NightMan.normalizedLocation(value)
+    if (!normalized) return
+    root.automaticLocation = normalized
+    automaticLocationFile.setText(JSON.stringify(normalized, null, 2) + "\n")
+  }
+
+  function seedAutomaticLocation() {
+    if (!root.automaticLocationLoaded || root.automaticLocation || !root.cacheLoaded || root.config.scheduleMode !== "automatic" || !root.location) return
+    root.saveAutomaticLocation(root.location)
+  }
+
   function maybeStartNetwork() {
-    if (!root.stateLoadStarted || !root.cacheLoaded || !root.settingsLoaded || locationProc.running || forecastProc.running) return
+    if (!root.stateLoadStarted || !root.cacheLoaded || !root.settingsLoaded || !root.automaticLocationLoaded || locationProc.running || forecastProc.running) return
     if (root.config.scheduleMode === "fixed") {
       root.location = null
       root.locationSource = "fixed"
@@ -475,9 +501,11 @@ Item {
   function useAutomaticCandidate(weatherRaw) {
     if (root.config.scheduleMode !== "automatic") return
     var weather = NightMan.parseWeatherLocation(weatherRaw)
-    if (weather) {
-      root.location = weather
-      root.locationSource = "weather"
+    var candidate = NightMan.automaticLocationCandidate(weather, root.automaticLocation, root.config.location)
+    if (candidate) {
+      root.location = candidate.location
+      root.locationSource = candidate.source
+      if (candidate.shouldCache) root.saveAutomaticLocation(candidate.location)
       fetchForecast()
     } else if (!locationProc.running) {
       locationProc.running = true
@@ -542,6 +570,16 @@ Item {
   }
 
   FileView {
+    id: automaticLocationFile
+    path: root.automaticLocationPath
+    atomicWrites: true
+    printErrors: false
+    onLoaded: root.loadAutomaticLocation(text())
+    onLoadFailed: root.loadAutomaticLocation("")
+    onSaveFailed: function() { root.lastError = "Unable to save automatic location" }
+  }
+
+  FileView {
     id: cacheFile
     path: root.cachePath
     atomicWrites: true
@@ -570,6 +608,7 @@ Item {
       settingsFile.reload()
       cacheFile.reload()
       overrideFile.reload()
+      automaticLocationFile.reload()
     }
   }
 
@@ -637,16 +676,18 @@ Item {
     id: locationProc
     property bool responseAccepted: false
     property bool superseded: false
-    command: ["curl", "-fsS", "--max-time", "6", "https://ipapi.co/json/"]
+    command: ["curl", "-fsS", "--max-time", "6",
+      "https://ipwho.is/?fields=success,message,city,region,country,latitude,longitude"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var parsed = NightMan.parseLocationResponse(text)
+        var parsed = NightMan.parseIpWhoResponse(text)
         locationProc.superseded = root.config.scheduleMode !== "automatic"
         locationProc.responseAccepted = parsed !== null && !locationProc.superseded
         if (locationProc.responseAccepted) {
           root.location = parsed
           root.locationSource = "ip"
+          root.saveAutomaticLocation(parsed)
         }
       }
     }

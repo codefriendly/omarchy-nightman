@@ -39,7 +39,7 @@ The schedule tabs remain **Automatic**, **Location**, and **Fixed times**.
 
 ### Automatic
 
-Uses sunrise and sunset for your current location. NightMan first checks for a location selected in Omarchy Weather. Otherwise it estimates your location from your IP address.
+Uses sunrise and sunset for your current location. NightMan first checks for a location selected in Omarchy Weather, then a previously detected automatic location or saved NightMan location. It estimates your location from your IP address only when no local location is available.
 
 IP location can be inaccurate with a VPN. Selecting a city in Omarchy Weather or NightMan avoids that problem.
 
@@ -53,9 +53,9 @@ Choose exact day and night start times in 24-hour `HH:MM` format. These times al
 
 ## Privacy and stored data
 
-Automatic IP location contacts [ipapi.co](https://ipapi.co/). Solar times and city search use [Open-Meteo](https://open-meteo.com/). A city search is sent after at least two characters are entered. Approximate coordinates are sent to Open-Meteo when IP location is used.
+Automatic IP location contacts [IPWhois.io](https://ipwhois.io/) only when no saved automatic, Omarchy Weather, or NightMan location is available. Solar times and city search use [Open-Meteo](https://open-meteo.com/). A city search is sent after at least two characters are entered. Approximate coordinates are sent to Open-Meteo when IP location is used.
 
-Settings, schedule cache, and any active temporary override are stored under:
+Settings, automatic location and schedule caches, and any active temporary override are stored under:
 
 ```text
 ~/.local/state/nightman/

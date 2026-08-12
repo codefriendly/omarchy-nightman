@@ -110,13 +110,14 @@ function parseSettings(raw) {
   }
 }
 
-function parseLocationResponse(raw) {
+function parseIpWhoResponse(raw) {
   try {
     var data = JSON.parse(String(raw || "{}"))
+    if (data.success !== true) return null
     return normalizedLocation({
       latitude: data.latitude,
       longitude: data.longitude,
-      name: data.city || data.region || data.country_name || data.country || ""
+      name: [data.city, data.region, data.country].filter(function(part) { return !!part }).join(", ")
     })
   } catch (e) {
     return null
@@ -130,6 +131,16 @@ function parseWeatherLocation(raw) {
   } catch (e) {
     return null
   }
+}
+
+function automaticLocationCandidate(weather, cached, saved) {
+  var weatherLocation = normalizedLocation(weather)
+  if (weatherLocation) return { location: weatherLocation, source: "weather", shouldCache: true }
+  var cachedLocation = normalizedLocation(cached)
+  if (cachedLocation) return { location: cachedLocation, source: "cache", shouldCache: false }
+  var savedLocation = normalizedLocation(saved)
+  if (savedLocation) return { location: savedLocation, source: "saved", shouldCache: true }
+  return null
 }
 
 function parseGeocodingResults(raw) {
@@ -368,8 +379,9 @@ if (typeof module !== "undefined") {
     normalizedFixedTimes: normalizedFixedTimes,
     normalizeSettings: normalizeSettings,
     parseSettings: parseSettings,
-    parseLocationResponse: parseLocationResponse,
+    parseIpWhoResponse: parseIpWhoResponse,
     parseWeatherLocation: parseWeatherLocation,
+    automaticLocationCandidate: automaticLocationCandidate,
     parseGeocodingResults: parseGeocodingResults,
     parseForecastResponse: parseForecastResponse,
     parseCache: parseCache,

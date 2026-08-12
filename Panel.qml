@@ -174,19 +174,19 @@ Panel {
     if (!nightMan || !nightMan.nextTransition) return "Pending schedule"
     var event = nightMan.scheduleSource === "sun"
       ? (nightMan.scheduledMode === "light" ? "Sunset" : "Sunrise")
-      : (nightMan.scheduledMode === "light" ? "Night starts" : "Day starts")
+      : (nightMan.scheduledMode === "light" ? "Night Starts" : "Day Starts")
     return event + " · " + formatTransition(nightMan.nextTransition)
   }
 
   function sourceLabel() {
     if (!nightMan) return "Starting"
-    if (nightMan.config.scheduleMode === "fixed") return "Fixed custom times"
-    if (nightMan.scheduleSource !== "sun") return "Solar unavailable · fixed-time fallback"
-    if (nightMan.locationSource === "explicit") return "Solar · chosen location"
-    if (nightMan.locationSource === "weather") return "Solar · Weather location"
+    if (nightMan.config.scheduleMode === "fixed") return "Fixed Custom Times"
+    if (nightMan.scheduleSource !== "sun") return "Solar Unavailable · Fixed-Time Fallback"
+    if (nightMan.locationSource === "explicit") return "Solar · Chosen Location"
+    if (nightMan.locationSource === "weather") return "Solar · Weather Location"
     if (nightMan.locationSource === "cache") return "Automatic Location"
-    if (nightMan.locationSource === "saved") return "Solar · saved location fallback"
-    return "Solar · automatic IP location"
+    if (nightMan.locationSource === "saved") return "Solar · Saved Location Fallback"
+    return "Solar · Automatic IP Location"
   }
 
   Process {

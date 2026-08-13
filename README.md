@@ -55,6 +55,8 @@ Choose exact day and night start times in 24-hour `HH:MM` format. These times al
 
 Automatic IP location contacts [IPWhois.io](https://ipwhois.io/) only when no saved automatic, Omarchy Weather, or NightMan location is available. Solar times and city search use [Open-Meteo](https://open-meteo.com/). A city search is sent after at least two characters are entered. Approximate coordinates are sent to Open-Meteo when IP location is used.
 
+NightMan's source is licensed under MIT. Third-party API data and hosted-service access have separate licence and usage terms; see [Third-party notices](THIRD_PARTY_NOTICES.md). The hosted Open-Meteo free API is limited to non-commercial use. Commercial users must follow Open-Meteo's current [terms](https://open-meteo.com/en/terms) and [plans](https://open-meteo.com/en/pricing), or modify NightMan to use a self-hosted compatible service.
+
 Settings, automatic location and schedule caches, and any active temporary override are stored under:
 
 ```text

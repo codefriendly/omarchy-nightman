@@ -178,6 +178,10 @@ Panel {
     return event + " · " + formatTransition(nightMan.nextTransition)
   }
 
+  function openLink(url) {
+    Qt.openUrlExternally(url)
+  }
+
   function sourceLabel() {
     if (!nightMan) return "Starting"
     if (nightMan.config.scheduleMode === "fixed") return "Fixed Custom Times"
@@ -356,6 +360,7 @@ Panel {
             InfoRow { label: "Schedule"; value: root.sourceLabel() }
             InfoRow { label: "Location"; value: root.nightMan ? root.nightMan.activeLocationName : "—" }
             InfoRow { label: "Next"; value: root.nextTransitionLabel() }
+            OpenMeteoAttribution { visible: root.nightMan && root.nightMan.scheduleSource === "sun" }
           }
 
           PanelSeparator { foreground: root.bar.foreground }
@@ -450,6 +455,8 @@ Panel {
                   onClicked: root.selectLocation(modelData)
                 }
               }
+
+              OpenMeteoAttribution { width: parent.width; subject: "Location data by"; suffix: "" }
             }
 
             Button {
@@ -586,6 +593,20 @@ Panel {
       horizontalAlignment: Text.AlignRight
       elide: Text.ElideLeft
     }
+  }
+
+  component OpenMeteoAttribution: Text {
+    property string subject: "Schedule derived from"
+    property string suffix: " data"
+    width: parent ? parent.width : 0
+    text: subject + " <a href=\"https://open-meteo.com/\">Open-Meteo</a>" + suffix + " · <a href=\"https://creativecommons.org/licenses/by/4.0/\">CC BY 4.0</a>"
+    textFormat: Text.StyledText
+    wrapMode: Text.WordWrap
+    color: Qt.darker(root.bar.foreground, 1.4)
+    linkColor: root.bar.foreground
+    font.family: root.bar.fontFamily
+    font.pixelSize: Style.font.caption
+    onLinkActivated: function(link) { root.openLink(link) }
   }
 
   component TimeField: Column {

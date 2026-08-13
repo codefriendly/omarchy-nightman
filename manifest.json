@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "codefriendly.nightman",
   "name": "NightMan",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "author": "codefriendly",
   "description": "Schedule the standard desktop color preference with a compact bar panel",
   "kinds": [

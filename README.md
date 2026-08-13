@@ -20,6 +20,18 @@ omarchy plugin add https://github.com/codefriendly/omarchy-nightman.git --enable
 
 Click the sun/moon icon in the bar to open NightMan.
 
+### Requirements
+
+NightMan requires Omarchy with Quattro plugin support, plus `curl`, `gsettings`, and `omarchy-theme-color`. These are normally included with Omarchy.
+
+### Remove
+
+```bash
+omarchy plugin remove codefriendly.nightman
+```
+
+Removing the plugin leaves its settings in `~/.local/state/nightman/` so they are available if you reinstall it. Delete that directory manually if you also want to remove the saved state.
+
 ## Appearance modes
 
 Your selected mode is saved across shell restarts and theme changes.

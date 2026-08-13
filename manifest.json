@@ -4,7 +4,7 @@
   "name": "NightMan",
   "version": "1.0.0",
   "author": "codefriendly",
-  "description": "Schedule the standard desktop color preference with a compact bar panel",
+  "description": "Control light and dark mode independently of your Omarchy theme. Switch manually, follow the theme, use sunrise and sunset, or set a fixed schedule.",
   "kinds": [
     "service",
     "bar-widget"
@@ -15,7 +15,7 @@
   },
   "barWidget": {
     "displayName": "NightMan",
-    "description": "Sun/moon indicator with mode and schedule controls",
+    "description": "Sun/moon status with light and dark mode and schedule controls",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"

@@ -1,14 +1,16 @@
 # NightMan
 
-NightMan manages the standard light/dark appearance preference on Omarchy. It can leave that preference with your Omarchy theme, follow sunrise and sunset, or stay pinned to day or night. Apps that follow the system appearance update automatically.
+*Fighter of the Day Man*
 
-NightMan changes only:
+NightMan manages light and dark appearance on Omarchy. It can follow your Omarchy theme, switch with sunrise and sunset, or stay pinned to day or night. Apps that use the standard system preference update automatically.
+
+NightMan changes only the following setting:
 
 ```text
 org.gnome.desktop.interface color-scheme
 ```
 
-It does not change your Omarchy theme, wallpaper, GTK theme, icons, or Night Light. It runs entirely as an Omarchy Quattro plugin; there is no systemd service.
+It does not change your Omarchy theme, wallpaper, GTK theme, icons, or Night Light. Everything runs inside the Omarchy shell as a Quattro plugin—there is no systemd service.
 
 ## Install
 
@@ -16,54 +18,50 @@ It does not change your Omarchy theme, wallpaper, GTK theme, icons, or Night Lig
 omarchy plugin add https://github.com/codefriendly/omarchy-nightman.git --enable
 ```
 
-Click the sun/moon bar icon to open the panel. The header always shows NightMan's current state.
+Click the sun/moon icon in the bar to open NightMan.
 
 ## Appearance modes
 
-The selected mode is saved across shell restarts and Omarchy theme changes:
+Your selected mode is saved across shell restarts and theme changes.
 
-- **Theme** (Follow theme) lets Omarchy control the appearance. When selected, NightMan reads the active Omarchy theme's light/dark mode, applies its matching color-scheme preference, and confirms the result. Later external changes are observed but not corrected. GNOME's `default` observation is displayed as Light because it expresses no dark preference.
-- **Auto** follows the saved schedule without any extra override controls.
-- **Day** selects light mode. It is permanent by default, but can instead last until the next scheduled change.
-- **Night** selects dark mode. It is permanent by default, but can instead last until the next scheduled change.
+- **Theme** matches the light or dark mode of your current Omarchy theme.
+- **Auto** follows your saved schedule.
+- **Day** uses light mode.
+- **Night** uses dark mode.
 
-After selecting Day or Night, choose **Permanent** or **Until _next schedule time_**. A temporary choice survives a shell restart and expires at the displayed solar or fixed-time transition. Selecting Day or Night itself always defaults to Permanent.
+Day and Night are permanent by default. You can instead keep either one active only until the next scheduled transition. Temporary choices survive shell restarts.
 
-NightMan continuously watches `color-scheme`. In Auto, pinned Day or Night, and a temporary Day or Night, changes made by a theme switch or another program are corrected immediately. Follow theme never corrects them. NightMan never writes `gtk-theme`.
+NightMan watches `color-scheme` for external changes. Auto, Day, and Night enforce their selected appearance; Theme leaves later changes alone.
 
-Existing installations migrate to **Auto** and keep their schedule and location settings. The schedule stays editable in Theme, Day, and Night, but is labelled saved and inactive until Auto—or a temporary Day/Night choice—uses it again.
-
-## Choosing a schedule
-
-The schedule tabs remain **Automatic**, **Location**, and **Fixed times**.
+## Schedule
 
 ### Automatic
 
-Uses sunrise and sunset for your current location. NightMan first checks for a location selected in Omarchy Weather, then a previously detected automatic location or saved NightMan location. It estimates your location from your IP address only when no local location is available.
+Uses sunrise and sunset for your current location. NightMan first checks Omarchy Weather and saved locations, then falls back to an approximate IP location when needed.
 
-IP location can be inaccurate with a VPN. Selecting a city in Omarchy Weather or NightMan avoids that problem.
+IP location can be inaccurate when using a VPN. Choose a city in Omarchy Weather or NightMan for more predictable results.
 
 ### Location
 
-Search for a city, select a result, and save it. NightMan keeps the saved location when you choose another schedule, so returning to Location restores it.
+Search for a city and save it. NightMan remembers the location if you switch to another schedule.
 
 ### Fixed times
 
-Choose exact day and night start times in 24-hour `HH:MM` format. These times also serve as the fallback if solar times are unavailable. Defaults are 07:00 and 19:00.
+Set day and night start times in 24-hour `HH:MM` format. These times are also used when solar data is unavailable. The defaults are 07:00 and 19:00.
 
 ## Privacy and stored data
 
-Automatic IP location contacts [IPWhois.io](https://ipwhois.io/) only when no saved automatic, Omarchy Weather, or NightMan location is available. Solar times and city search use [Open-Meteo](https://open-meteo.com/). A city search is sent after at least two characters are entered. Approximate coordinates are sent to Open-Meteo when IP location is used.
+Automatic IP location contacts [IPWhois.io](https://ipwhois.io/) only when Omarchy Weather and saved locations have no usable location. Solar times and city search use [Open-Meteo](https://open-meteo.com/). Searches are sent after you enter at least two characters, and approximate coordinates are sent to Open-Meteo when IP location is used.
 
-NightMan's source is licensed under MIT. Third-party API data and hosted-service access have separate licence and usage terms; see [Third-party notices](THIRD_PARTY_NOTICES.md). The hosted Open-Meteo free API is limited to non-commercial use. Commercial users must follow Open-Meteo's current [terms](https://open-meteo.com/en/terms) and [plans](https://open-meteo.com/en/pricing), or modify NightMan to use a self-hosted compatible service.
-
-Settings, automatic location and schedule caches, and any active temporary override are stored under:
+Settings, cached locations and schedules, and temporary overrides are stored in:
 
 ```text
 ~/.local/state/nightman/
 ```
 
-## Command-line controls
+NightMan is MIT-licensed, but third-party data and hosted services have their own terms. See [Third-party notices](THIRD_PARTY_NOTICES.md). Open-Meteo's free hosted API is limited to non-commercial use; commercial users should review its current [terms](https://open-meteo.com/en/terms) and [plans](https://open-meteo.com/en/pricing), or modify NightMan to use a compatible self-hosted service.
+
+## Command line
 
 ```bash
 omarchy-shell codefriendly.nightman status
@@ -73,9 +71,9 @@ omarchy-shell codefriendly.nightman modeDay
 omarchy-shell codefriendly.nightman modeNight
 ```
 
-These unambiguous `mode…` commands select persistent modes. `status` returns the persistent mode, effective preference, schedule state, temporary override, next transition, location source, and recent error as JSON.
+The four mode commands select persistent modes. `status` returns the current mode, preference, schedule, next transition, location source, and most recent error as JSON.
 
-The older commands remain for compatibility:
+Temporary Auto-mode controls are also available:
 
 ```bash
 omarchy-shell codefriendly.nightman toggle
@@ -84,9 +82,7 @@ omarchy-shell codefriendly.nightman dark
 omarchy-shell codefriendly.nightman auto
 ```
 
-They are available only while Auto is active. `light`, `dark`, and `toggle` create the same temporary Day or Night choice shown in the panel. `auto` clears that temporary choice and returns to the schedule; it does not select Auto from another persistent mode. Mutating commands return `not ready` until saved state has loaded.
-
-Removing or disabling the NightMan widget stops its plugin service, so it no longer monitors or changes the preference.
+`light`, `dark`, and `toggle` last until the next scheduled transition. `auto` clears the temporary choice and returns to the schedule. These commands work only while Auto is active.
 
 ## Development
 

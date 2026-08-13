@@ -4,6 +4,8 @@
 
 NightMan manages light and dark appearance on Omarchy. It can follow your Omarchy theme, switch with sunrise and sunset, or stay pinned to day or night. Apps that use the standard system preference update automatically.
 
+![NightMan preview](preview.png)
+
 NightMan changes only the following setting:
 
 ```text

@@ -289,11 +289,12 @@ Panel {
             width: parent.width
             spacing: Style.space(5)
             readonly property real cellWidth: (width - spacing * 3) / 4
+            readonly property real cellHeight: Math.max(modeFollow.implicitHeight, modeAuto.implicitHeight, modeDay.implicitHeight, modeNight.implicitHeight)
 
-            ModeButton { id: modeFollow; label: "Theme"; glyph: ""; value: "follow"; width: modeRow.cellWidth }
-            ModeButton { id: modeAuto; label: "Auto"; glyph: "◌"; value: "auto"; width: modeRow.cellWidth }
-            ModeButton { id: modeDay; label: "Day"; glyph: "☀"; value: "day"; width: modeRow.cellWidth }
-            ModeButton { id: modeNight; label: "Night"; glyph: "☾"; value: "night"; width: modeRow.cellWidth }
+            ModeButton { id: modeFollow; label: "Theme"; glyph: ""; value: "follow"; width: modeRow.cellWidth; height: modeRow.cellHeight }
+            ModeButton { id: modeAuto; label: "Auto"; glyph: "◌"; value: "auto"; width: modeRow.cellWidth; height: modeRow.cellHeight }
+            ModeButton { id: modeDay; label: "Day"; glyph: "☀"; value: "day"; width: modeRow.cellWidth; height: modeRow.cellHeight }
+            ModeButton { id: modeNight; label: "Night"; glyph: "☾"; value: "night"; width: modeRow.cellWidth; height: modeRow.cellHeight }
           }
 
           Column {
@@ -602,6 +603,8 @@ Panel {
     text: subject + " <a href=\"https://open-meteo.com/\">Open-Meteo</a>" + suffix + " · <a href=\"https://creativecommons.org/licenses/by/4.0/\">CC BY 4.0</a>"
     textFormat: Text.StyledText
     wrapMode: Text.WordWrap
+    topPadding: Style.space(4)
+    horizontalAlignment: Text.AlignHCenter
     color: Qt.darker(root.bar.foreground, 1.4)
     linkColor: root.bar.foreground
     font.family: root.bar.fontFamily
